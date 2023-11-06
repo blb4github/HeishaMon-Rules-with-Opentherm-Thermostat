@@ -7,9 +7,12 @@
   Add your open source license, GitHub uses MIT license.
 -->
 
-# GitHub Pages
+# Welcome to HeishaMon-Rules-with-Opentherm-Thermostat
 
-_Create a site or blog from your GitHub repositories with GitHub Pages._
+
+
+The purpose of this all is to publish the rules I use on my HeishaMon to control my Panasonic Heat Pump in combination with an Opentherm thermostat.
+
 
 </header>
 
