@@ -4,24 +4,24 @@
 function | Rules | Description
 :--- | --- | ---
 ALL|on System#Boot then|
-DHW| #allowDHW = 1;|allow DHW function
-OTT| #allowOTThermostat = 1;|allow OTT Thermostat function
-PS| #allowPumpSpeed = 1;|allow PumpSpeed function
-SM| #allowSilentMode = 1;|allow SilentMode function
-SS| #allowSoftStart = 1;|allow SoftStart function
-SyncOT| #allowSyncOT = 1;|allow Sync OT function
-WAR| #allowWAR = 1;|allow WAR function
+DHW| #allowDHW = 1;|allow DHW function (0/1)
+OTT| #allowOTThermostat = 1;|allow OTT Thermostat function (0/1)
+PS| #allowPumpSpeed = 1;|allow PumpSpeed function (0/1)
+SM| #allowSilentMode = 1;|allow SilentMode function (0/1)
+SS| #allowSoftStart = 1;|allow SoftStart function (0/1)
+SyncOT| #allowSyncOT = 1;|allow Sync OT function (0/1)
+WAR| #allowWAR = 1;|allow WAR function (0/1)
 ALL||
-SyncOT| #chEnable = -1;|set variables
-SyncOT OTT| #chEnableOffTime=-1;|
-SyncOT| #chEnableTimeOff=-1;|
-OTT| #chSetPoint = -1;|
-OTT| #compRunTime = -1;|
-OTT| #compStartTime = -1;|
-OTT| #compState = -1;|
-DHW| #DHWRun = -1;|
-DHW| #legionellaRunDay = 7;|
-OTT| #mainTargetTemp = -1;|
+SyncOT| #chEnable = -1;|#chEnable is clean ?chEnable 
+SyncOT OTT| #chEnableOffTime=-1;|Time?chEnable goes off
+SyncOT| #chEnableTimeOff=-1;|?chEnable Off Timer
+OTT| #chSetPoint = -1;|copy of ?chEnable
+OTT| #compRunTime = -1;|Time the compressor is running
+OTT| #compStartTime = -1;|Time the compressor starts running
+OTT| #compState = -1;|compressor state (0/1)
+DHW| #DHWRun = -1;|DHWrun state (0/1)
+DHW| #legionellaRunDay = 7;|1 (Monday) .. 7 (Saturday)
+OTT| #mainTargetTemp = -1;|Water Temperature target for HEAT
 PS| #maxPumpDuty = 85;|value which fits my installation (~ 11l/m)
 WAR SyncOT| #maxTa = -1;|
 SM| #mildMode = -1;|
@@ -269,7 +269,7 @@ OTT|   if @Heatpump_State != 1 && #chEnable == 1 then|Set HP on if #chEnable = 1
 OTT|    @SetHeatpump = 1;|
 OTT|   end|
 OTT|  end|
-OTT|  if #chEnableOffTime > 15 && @ThreeWay_Valve_State == 0 && (#compRunTime > 30 || #compState == 0) then|Set HP off if #chEnable is off for
+OTT|  if #chEnableOffTime > 15 && @ThreeWay_Valve_State == 0 && (#compRunTime > 30 || #compState == 0) && @Outside_Temp > 2 then|Set HP off if #chEnable is off for
 OTT|   @SetHeatpump = 0;|15 minutes & compressor is off or 
 OTT|  end|on for more than 30 minutes
 OTT|  #allowOTThermostat = 0;|
@@ -355,3 +355,4 @@ OTT SS|   #compRunTime = #timeRef - #compStartTime + 10080;|
 OTT SS|  end|
 OTT SS| end|
 OTT SS|end|
+
