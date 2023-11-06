@@ -354,4 +354,4 @@ OTT SS|  if #compRunTime < 0 then|
 OTT SS|   #compRunTime = #timeRef - #compStartTime + 10080;|
 OTT SS|  end|
 OTT SS| end|
-OTT SS|end|![afbeelding](https://github.com/blb4github/HeishaMon-Rules-with-Opentherm-Thermostat/assets/35904565/2c28ffd0-f4fa-4c92-bc49-9ac3f5987610)
+OTT SS|end|
