@@ -301,6 +301,31 @@ on timer=8 then
 	#allowOTThermostat  = 1;
 end
 
+on @Compressor_Freq then
+	compressorFreq();
+end
+
+on compressorFreq then
+	if @Compressor_Freq > 18 then
+		if #compState < 1 then
+			#compStartTime = #timeRef;
+			#compState = 1;
+		end
+		#compRunTime = #timeRef - #compStartTime;
+		if #compRunTime < 0 then
+			#compRunTime = #timeRef - #compStartTime + 10080;
+		end
+	else
+		#compState = 0;
+		#softStartCorrection = 0;
+		#softStartPhase = -1;
+		if #mildMode != #silentMode && #mildMode != -1 && #silentMode != 1 then
+			#mildMode = #silentMode;
+			setQuietMode();
+		end
+	end
+end
+
 on softStart then
 	if #allowSoftStart == 1 && #compState == 1 then
 		if #compRunTime < 3 then
@@ -342,31 +367,6 @@ on timer=9 then
 	if #softStartCorrection > 0 then
 		#softStartCorrection = #softStartCorrection - 1;
 		setTimer(9,900);
-	end
-end
-
-on @Compressor_Freq then
-	compressorFreq();
-end
-
-on compressorFreq then
-	if @Compressor_Freq > 18 then
-		if #compState < 1 then
-			#compStartTime = #timeRef;
-			#compState = 1;
-		end
-		#compRunTime = #timeRef - #compStartTime;
-		if #compRunTime < 0 then
-			#compRunTime = #timeRef - #compStartTime + 10080;
-		end
-	else
-		#compState = 0;
-		#softStartCorrection = 0;
-		#softStartPhase = -1;
-		if #mildMode != #silentMode && #mildMode != -1 && #silentMode != 1 then
-			#mildMode = #silentMode;
-			setQuietMode();
-		end
 	end
 end
 ```
