@@ -86,6 +86,7 @@ on System#Boot then
 	#compStartTime = -1;
 	#compState = -1;
 	#DHWRun = -1;
+	#firstBoot = 1;
 	#legionellaRunDay = 7;
 	#mainTargetTemp = -1;
 	#maxPumpDuty = 85;
@@ -98,23 +99,86 @@ on System#Boot then
 	#softStartCorrection = 0;
 	#softStartPhase = -1;
 	#timeRef = -1;
-	setTimer(1,10);
-	setTimer(2,15);
+	setTimer(1,60);
+	setTimer(2,10);
 end
 
 on timer=1 then
-	calculateWAR();
-	setSilentMode();
-	syncOpenTherm();
-	setMaxPumpDuty();
-	checkDHW();
-	OTThermostat();
+	if #firstBoot == 1 then
+		#firstBoot = 0;
+		compressorFreq();
+		calculateWAR();
+		syncOpenTherm();
+	else
+		calculateWAR();
+		setSilentMode();
+		syncOpenTherm();
+		setMaxPumpDuty();
+		checkDHW();
+		OTThermostat();
+	end
 	setTimer(1,15);
 end
 
 on timer=2 then
 	#timeRef = %day * 1440 + %hour * 60 + %minute;
 	setTimer(2,60);
+end
+```
+
+</details>
+
+
+### setSilentMode
+
+This function sets the quiet mode based on a combination of the current time and the value of `@Outside_Temp`. It will limit the frequency of the compressor and the fan speed, reducing the noice from the Heat Pump with reducing the power and efficiency of the Heat Pump as trade off. On the other hand it will help the heatpump running more stable and in low frequencies and reach low frequencies earlier than without QM.
+
+> [!IMPORTANT]  
+> Using this function will enable quiet mode which might impact your power usage and the performance of your heatpump. To overcome this quiet mode can be swiched on/off by softStart function, see that function for more details.
+
+<details>
+
+<summary>setSilentMode</summary>
+
+```LUA
+on setSilentMode then
+	if isset(@Outside_Temp) == 1 && isset(@Heatpump_State) then
+		if #allowSilentMode == 1 then
+			#allowSilentMode = 0;
+			if @Outside_Temp < 10 then
+				#silentMode = 2;
+			else
+				#silentMode = 3;
+			end
+			if @Outside_Temp < 5 then
+				#silentMode = 1;
+			end
+			if @Outside_Temp < 2 then
+				if %hour > 22 || %hour < 7 then
+					#silentMode = 1;
+				else
+					#silentMode = 0;
+				end
+			end
+			setTimer(3, 900);
+			setQuietMode();
+		end
+	end
+end
+
+on timer=3 then
+	#allowSilentMode = 1;
+end
+
+on setQuietMode then
+	if #mildMode > -1 then
+		#quietMode = #mildMode;
+	else
+		#quietMode = #silentMode;
+	end
+	if @Quiet_Mode_Level != #quietMode then
+		@SetQuietMode = #quietMode;
+	end
 end
 ```
 
@@ -220,61 +284,6 @@ end
 
 </details>
 
-### setSilentMode
-
-This function sets the quiet mode based on a combination of the current time and the value of `@Outside_Temp`. It will limit the frequency of the compressor and the fan speed, reducing the noice from the Heat Pump with reducing the power and efficiency of the Heat Pump as trade off. On the other hand it will help the heatpump running more stable and in low frequencies and reach low frequencies earlier than without QM.
-
-> [!IMPORTANT]  
-> Using this function will enable quiet mode which might impact your power usage and the performance of your heatpump. To overcome this quiet mode can be swiched on/off by softStart function, see that function for more details.
-
-<details>
-
-<summary>setSilentMode</summary>
-
-```LUA
-on setSilentMode then
-	if isset(@Outside_Temp) == 1 && isset(@Heatpump_State) then
-		if #allowSilentMode == 1 then
-			#allowSilentMode = 0;
-			if @Outside_Temp < 10 then
-				#silentMode = 2;
-			else
-				#silentMode = 3;
-			end
-			if @Outside_Temp < 5 then
-				#silentMode = 1;
-			end
-			if @Outside_Temp < 2 then
-				if %hour > 22 || %hour < 7 then
-					#silentMode = 1;
-				else
-					#silentMode = 0;
-				end
-			end
-			setTimer(3, 900);
-			setQuietMode();
-		end
-	end
-end
-
-on timer=3 then
-	#allowSilentMode = 1;
-end
-
-on setQuietMode then
-	if #mildMode > -1 then
-		#quietMode = #mildMode;
-	else
-		#quietMode = #silentMode;
-	end
-	if @Quiet_Mode_Level != #quietMode then
-		@SetQuietMode = #quietMode;
-	end
-end
-```
-
-</details>
-
 ### setMaxPumpDuty
 
 This function adjust the pump duty based on the state of the heatpump and the outside temperature. This function will run every 60 seconds based on timer 6.
@@ -326,6 +335,7 @@ end
 on timer=6 then
 	#allowPumpSpeed = 1;
 end
+
 ```
 
 </details>
@@ -445,6 +455,10 @@ on timer=8 then
 end
 
 on @Compressor_Freq then
+	compressorFreq();
+end
+
+on compressorFreq then
 	if @Compressor_Freq > 18 then
 		if #compState < 1 then
 			#compStartTime = #timeRef;
@@ -458,7 +472,7 @@ on @Compressor_Freq then
 		#compState = 0;
 		#softStartCorrection = 0;
 		#softStartPhase = -1;
-		if #mildMode != #silentMode then
+		if #mildMode != #silentMode && #mildMode != -1 && #silentMode != 1 then
 			#mildMode = #silentMode;
 			setQuietMode();
 		end
@@ -479,26 +493,22 @@ This function is an extension to the OTTThermostat function.
 ```LUA
 on softStart then
 	if #allowSoftStart == 1 && #compState == 1 then
-		if #compRunTime == -1 then
-			#softStartPhase = 0;
+		if #compRunTime < 3 then
+			#softStartPhase = 1;
+			#softStartCorrection = @Main_Outlet_Temp - 1 - #chSetpoint;
 		else
-			if #compRunTime < 3 then
-				#softStartPhase = 1;
-				#softStartCorrection = @Main_Outlet_Temp - 1 - #chSetpoint;
+			if #compRunTime < 120 then
+				#softStartPhase = 2;
+				if #chSetpoint <= @Main_Outlet_Temp then
+					#softStartCorrection = @Main_Outlet_Temp - 0.7 - #chSetpoint;
+				end
+				if #chSetpoint > @Main_Outlet_Temp then
+					#softStartCorrection = @Main_Outlet_Temp + 1 - #chSetpoint;
+				end
 			else
-				if #compRunTime < 120 then
-					#softStartPhase = 2;
-					if #chSetpoint <= @Main_Outlet_Temp then
-						#softStartCorrection = @Main_Outlet_Temp - 0.7 - #chSetpoint;
-					end
-					if #chSetpoint > @Main_Outlet_Temp then
-						#softStartCorrection = @Main_Outlet_Temp + 1 - #chSetpoint;
-					end
-				else
-					if #softStartPhase == 2 then
-						#softStartPhase = 3;
-						setTimer(9,5);
-					end
+				if #softStartPhase == 2 then
+					#softStartPhase = 3;
+					setTimer(9,5);
 				end
 			end
 		end
@@ -508,7 +518,7 @@ on softStart then
 		if #softStartCorrection < -5 then
 			#softStartCorrection = -5;
 		end
-		if @Compressor_Freq > 18 && @Compressor_Freq < 26 && #softStartPhase > 1 then
+		if @Compressor_Freq > 18 && @Compressor_Freq < 26 then
 			#mildMode = 0;
 			setQuietMode();
 		end
