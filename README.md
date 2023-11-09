@@ -11,7 +11,17 @@
 
 
 
-The purpose of this all is to publish the rules I use on my HeishaMon to control my Panasonic Heat Pump in combination with an Opentherm thermostat.
+The purpose of this site is to publish the rules I use on my HeishaMon to control my Panasonic Heat Pump in combination with an Opentherm thermostat. I try to keep it as univeral as possible but it is at the end taylored to my situation and needs. You can just copy it and start using it (at your own risk) or, better, you can use is as inspiration for your own rules set.
+
+My setup:
+
+a)	Panasonic Heat Pump WH-MDC07J3E5 used for central heating and DHW (external tank);
+
+b)	Heishamon Opentherm version, firmware Alpha-f15a0fe;
+
+c)	Central heating system build out of radiators and convectors;
+
+d)	Evohome zone thermostat with opentherm boiler module.
 
 
 </header>
