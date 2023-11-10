@@ -9,19 +9,21 @@ on System#Boot then
 	#allowWAR = 1;
 
 	#chEnable = -1;
-	#chEnableOffTime=-1;
-	#chEnableTimeOff=-1;
+	#chEnableOffTime = -1;
+	#chEnableTimeOff = -1;
 	#chSetPoint = -1;
 	#compRunTime = -1;
 	#compStartTime = -1;
 	#compState = -1;
 	#DHWRun = -1;
 	#firstBoot = 1;
+	#heatPumpState = -1;
 	#legionellaRunDay = 7;
 	#mainTargetTemp = -1;
 	#maxPumpDuty = 85;
 	#maxTa = -1;
 	#mildMode = -1;
+	#operatingMode = -1;
 	#prevHeatPumpState = -1;
 	#prevOperatingMode = -1;
 	#quietMode = -1;
@@ -36,6 +38,8 @@ end
 on timer=1 then
 	if #firstBoot == 1 then
 		#firstBoot = 0;
+		#heatPumpState = @Heatpump_State;
+		#operatingMode = @Operating_Mode_State;
 		compressorFreq();
 		calculateWAR();
 		syncOpenTherm();
@@ -56,27 +60,25 @@ on timer=2 then
 end
 
 on setSilentMode then
-	if isset(@Outside_Temp) == 1 && isset(@Heatpump_State) then
-		if #allowSilentMode == 1 then
-			#allowSilentMode = 0;
-			if @Outside_Temp < 10 then
+	if #allowSilentMode == 1 then
+		#allowSilentMode = 0;
+		if @Outside_Temp > 9 then
+			#silentMode = 3;
+		else
+			if @Outside_Temp > 4 then
 				#silentMode = 2;
 			else
-				#silentMode = 3;
-			end
-			if @Outside_Temp < 5 then
-				#silentMode = 1;
-			end
-			if @Outside_Temp < 2 then
-				if %hour > 22 || %hour < 7 then
-					#silentMode = 1;
-				else
-					#silentMode = 0;
+				if @Outside_Temp > 1 then
+					if %hour > 22 || %hour < 7 then
+						#silentMode = 1;
+					else
+						#silentMode = 0;
+					end
 				end
 			end
-			setTimer(3, 900);
-			setQuietMode();
 		end
+		setTimer(3, 900);
+		setQuietMode();
 	end
 end
 
@@ -88,7 +90,11 @@ on setQuietMode then
 	if #mildMode > -1 then
 		#quietMode = #mildMode;
 	else
-		#quietMode = #silentMode;
+		if #chEnable == 0 && #compState == 1 then
+			#quietMode = 3;
+		else
+			#quietMode = #silentMode;
+		end
 	end
 	if @Quiet_Mode_Level != #quietMode then
 		@SetQuietMode = #quietMode;
@@ -143,23 +149,21 @@ end
 
 on calculateWAR then
 	if #allowWAR == 1 then
-		if isset(@Z1_Heat_Curve_Target_Low_Temp) == 1 && isset(@Z1_Heat_Curve_Outside_High_Temp) == 1 && isset(@Z1_Heat_Curve_Target_High_Temp) == 1 && isset(@Z1_Heat_Curve_Outside_Low_Temp) == 1 then
-			$Ta1 = @Z1_Heat_Curve_Target_Low_Temp;
-			$Tb1 = @Z1_Heat_Curve_Outside_High_Temp;
-			$Ta2 = 36;
-			$Tb2 = @Z1_Heat_Curve_Outside_Low_Temp;
-			if @Outside_Temp >= $Tb1 then
-				#maxTa = $Ta1;
+		$Ta1 = @Z1_Heat_Curve_Target_Low_Temp;
+		$Tb1 = @Z1_Heat_Curve_Outside_High_Temp;
+		$Ta2 = 36;
+		$Tb2 = @Z1_Heat_Curve_Outside_Low_Temp;
+		if @Outside_Temp >= $Tb1 then
+			#maxTa = $Ta1;
+		else
+			if @Outside_Temp <= $Tb2 then
+				#maxTa = $Ta2;
 			else
-				if @Outside_Temp <= $Tb2 then
-					#maxTa = $Ta2;
-				else
-					#maxTa = 1 + floor(0.9 + $Ta1 + (($Tb1 - @Outside_Temp) * ($Ta2 - $Ta1) / ($Tb1 - $Tb2)));
-				end
+				#maxTa = 1 + floor(0.9 + $Ta1 + (($Tb1 - @Outside_Temp) * ($Ta2 - $Ta1) / ($Tb1 - $Tb2)));
 			end
 		end
 		#allowWAR = 0;
-		setTimer(5,900);
+		setTimer(5,1800);
 	end
 end
 
@@ -317,6 +321,8 @@ on compressorFreq then
 		end
 	else
 		#compState = 0;
+		#compStartTime = -1;
+		#compRunTime = -1;
 		#softStartCorrection = 0;
 		#softStartPhase = -1;
 		if #mildMode != #silentMode && #mildMode != -1 && #silentMode != 1 then
@@ -330,12 +336,16 @@ on softStart then
 	if #allowSoftStart == 1 && #compState == 1 then
 		if #compRunTime < 3 then
 			#softStartPhase = 1;
-			#softStartCorrection = @Main_Outlet_Temp - 1 - #chSetpoint;
+			#softStartCorrection = @Main_Outlet_Temp - #chSetpoint;
 		else
 			if #compRunTime < 120 then
 				#softStartPhase = 2;
-				if #chSetpoint <= @Main_Outlet_Temp then
-					#softStartCorrection = @Main_Outlet_Temp - 0.7 - #chSetpoint;
+				if @Compressor_Freq < 22 then
+					#softStartCorrection = @Main_Outlet_Temp - #chSetpoint;
+				else
+					if #chSetpoint <= @Main_Outlet_Temp then
+						#softStartCorrection = @Main_Outlet_Temp - 0.7 - #chSetpoint;
+					end
 				end
 				if #chSetpoint > @Main_Outlet_Temp then
 					#softStartCorrection = @Main_Outlet_Temp + 1 - #chSetpoint;
