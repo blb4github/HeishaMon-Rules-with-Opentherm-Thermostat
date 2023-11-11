@@ -18,12 +18,14 @@ on System#Boot then
 	#DHWRun = -1;
 	#firstBoot = 1;
 	#heatPumpState = -1;
+	#heatSeason = 1;
 	#legionellaRunDay = 7;
 	#mainTargetTemp = -1;
 	#maxPumpDuty = 85;
 	#maxTa = -1;
 	#mildMode = -1;
 	#operatingMode = -1;
+	#prevDHWHeatDelta = -1;
 	#prevHeatPumpState = -1;
 	#prevOperatingMode = -1;
 	#quietMode = -1;
@@ -43,6 +45,9 @@ on timer=1 then
 		compressorFreq();
 		calculateWAR();
 		syncOpenTherm();
+		if #heatSeason == 1 && @Operating_Mode_State != 3 then
+			@SetOperationMode = 3;
+		end
 	else
 		calculateWAR();
 		setSilentMode();
@@ -149,6 +154,7 @@ end
 
 on calculateWAR then
 	if #allowWAR == 1 then
+		#allowWAR = 0;
 		$Ta1 = @Z1_Heat_Curve_Target_Low_Temp;
 		$Tb1 = @Z1_Heat_Curve_Outside_High_Temp;
 		$Ta2 = 36;
@@ -156,13 +162,11 @@ on calculateWAR then
 		if @Outside_Temp >= $Tb1 then
 			#maxTa = $Ta1;
 		else
-			if @Outside_Temp <= $Tb2 then
-				#maxTa = $Ta2;
+			if @Outside_Temp <= $Tb2 then	#maxTa = $Ta2;
 			else
 				#maxTa = 1 + floor(0.9 + $Ta1 + (($Tb1 - @Outside_Temp) * ($Ta2 - $Ta1) / ($Tb1 - $Tb2)));
 			end
 		end
-		#allowWAR = 0;
 		setTimer(5,1800);
 	end
 end
@@ -217,30 +221,36 @@ end
 on checkDHW then
 	if #allowDHW == 1 then
 		#allowDHW = 0;
-		if @ThreeWay_Valve_State == 0 && (@DHW_Temp < 39 || (%hour == 13 && (%day == #LegionellaRunDay || @DHW_Temp < @DHW_Target_Temp + @DHW_Heat_Delta))) then
-			#prevOperatingMode = @Operating_Mode_State;
+		if @ThreeWay_Valve_State == 0 && (%hour == 13 && (%day == #LegionellaRunDay || @DHW_Temp < @DHW_Target_Temp - 7)) then
 			#prevHeatPumpState = @Heatpump_State;
-			@SetOperationMode = 3;
+			#prevDHWHeatDelta = @DHW_Heat_Delta;
+			@SetDHWHeatDelta = -8;
 			if @Heatpump_State != 1 then
 				@SetHeatpump = 1;
-			end 
-			if %day == #legionellaRunDay && %hour == 13 then
-				@SetForceSterilization = 1;
 			end
-			#DHWRun = 1;
+			if %day == #legionellaRunDay && %Hour == 13 then
+				@SetForceSterilization = 1;
+				#DHWRun = 3;
+			else
+				#DHWRun = 2;
+			end
 		end
-		if #DHWRun == 1 then
-			if @ThreeWay_Valve_State == 0 && @DHW_Temp > 49 then
-				@SetOperationMode = #OperatingModeLast;
-				if @Heatpump_State != #HeatPumpStateLast then
-					@SetHeatpump = #HeatPumpStateLast;
+		if #DHWRun > 0 then
+			if @ThreeWay_Valve_State == 0 && @DHW_Temp > 49 && @Sterilization_State != 1 then
+				if @Heatpump_State != #prevHeatPumpState then
+					@SetHeatpump = #prevHeatPumpState;
+					@SetDHWHeatDelta = #prevDHWHeatDelta;
 				end
-				#OperatingModeLast = 3;
-				#HeatPumpStateLast = 1;
 				#DHWRun = -1;
 			end
 		end
 		setTimer(7,900);
+	end
+end
+
+on @ThreeWay_Valve_State then
+	if @ThreeWay_Valve_State == 1 then
+		#DHWRun = 1;
 	end
 end
 
@@ -283,9 +293,6 @@ on OTThermostat then
 			end
 			if @Z1_Heat_Request_Temp != #mainTargetTemp then
 				@SetZ1HeatRequestTemperature = #mainTargetTemp;
-			end
-			if @Operating_Mode_State != 0 then
-				@SetOperationMode = 0;
 			end
 			if @Heatpump_State != 1 && #chEnable == 1 then
 				@SetHeatpump = 1;
