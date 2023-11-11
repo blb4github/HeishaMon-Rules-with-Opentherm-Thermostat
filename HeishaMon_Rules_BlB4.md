@@ -219,7 +219,7 @@ on timer=6 then
 end
 
 on checkDHW then
-	if #allowDHW == 1 then
+	if #allowDHW == 1 && ?dhwEnable == 1 then
 		#allowDHW = 0;
 		if @ThreeWay_Valve_State == 0 && (%hour == 13 && (%day == #LegionellaRunDay || @DHW_Temp < @DHW_Target_Temp - 7)) then
 			#prevHeatPumpState = @Heatpump_State;
