@@ -224,7 +224,7 @@ on checkDHW then
 			if @Heatpump_State != 1 then
 				@SetHeatpump = 1;
 			end 
-			if %day == #legionellaRunDay && hour ==13 then
+			if %day == #legionellaRunDay && %hour ==13 then
 				@SetForceSterilization = 1;
 			end
 			#DHWRun = 1;
