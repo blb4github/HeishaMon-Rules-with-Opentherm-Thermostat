@@ -228,7 +228,7 @@ DHW|   @SetOperationMode = 3;|
 DHW|   if @Heatpump_State != 1 then|
 DHW|    @SetHeatpump = 1;|
 DHW|   end|
-DHW|   if %day == #legionellaRunDay then|
+DHW|   if %day == #legionellaRunDay && %hour == 13 then|
 DHW|    @SetForceSterilization = 1;|
 DHW|   end|
 DHW|   #DHWRun = 1;|
