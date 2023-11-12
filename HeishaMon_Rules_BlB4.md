@@ -357,8 +357,8 @@ on timer=1 then
 		compressorFreq();
 		calculateWAR();
 		syncOpenTherm();
-		if #heatSeason == 1 && @Operating_Mode_State != 3 then
-			@SetOperationMode = 3;
+		if #heatSeason == 1 && @Operating_Mode_State != 4 then
+			@SetOperationMode = 4;
 		end
 	else
 		calculateWAR();
