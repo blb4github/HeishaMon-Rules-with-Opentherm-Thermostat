@@ -257,9 +257,6 @@ on syncOpenTherm then
 		?dhwSetpoint = @DHW_Target_Temp;
 		if isset(?chEnable) && isset(?chSetpoint) && isset(?roomTempSet) && isset(?roomTemp) then
 			#thermostatState = 1;
-			#aaaa = 1;
-		else
-			#aaaa = 0;
 		end
 		if ?chEnable == 1 then
 			#chEnable = 1;
