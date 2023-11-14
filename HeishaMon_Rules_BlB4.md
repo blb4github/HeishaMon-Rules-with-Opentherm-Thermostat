@@ -18,7 +18,6 @@ on System#Boot then
 	#DHWRun = -1;
 	#firstBoot = 1;
 	#heatPumpState = -1;
-	#heatSeason = 1;
 	#legionellaRunDay = 7;
 	#mainTargetTemp = -1;
 	#maxPumpDuty = 85;
@@ -173,12 +172,12 @@ on checkDHW then
 		end
 		if #DHWRun == 1 then
 			if @ThreeWay_Valve_State == 0 && @DHW_Temp > 49 then
-				@SetOperationMode = #OperatingModeLast;
-				if @Heatpump_State != #HeatPumpStateLast then
-					@SetHeatpump = #HeatPumpStateLast;
+				@SetOperationMode = #prevOperatingMode;
+				if @Heatpump_State != #prevHeatPumpState then
+					@SetHeatpump = #prevHeatPumpState;
 				end
-				#OperatingModeLast = 3;
-				#HeatPumpStateLast = 1;
+				#prevOperatingMode = 3;
+				#prevHeatPumpState = 1;
 				#DHWRun = -1;
 			end
 		end
