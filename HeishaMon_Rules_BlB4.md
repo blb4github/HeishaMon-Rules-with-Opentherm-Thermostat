@@ -347,12 +347,6 @@ on compressorFreq then
 	end
 end
 
-on @ThreeWay_Valve_State then
-	if @ThreeWay_Valve_State == 1 then
-		#DHWRun = 1;
-	end
-end
-
 on @Compressor_Freq then
 	compressorFreq();
 end
