@@ -18,6 +18,7 @@ on System#Boot then
 	#DHWRun = -1;
 	#firstBoot = 1;
 	#heatPumpState = -1;
+	#heatSeason = 1;
 	#legionellaRunDay = 7;
 	#mainTargetTemp = -1;
 	#maxPumpDuty = 85;
@@ -120,7 +121,7 @@ on OTThermostat then
 				#mainTargetTemp = floor(#mainTargetTemp);
 				if #compState == 1 then
 					if #mainTargetTemp + 2 < @Main_Outlet_Temp then
-						#mainTargetTemp = round(@Main_Outlet_Temp - 1.5);
+						#mainTargetTemp = #mainTargetTemp + 1;
 					end
 					#roomTempDelta = ?roomTempSet - ?roomTemp;
 					if #roomTempDelta > 1 && #chEnableOffTime > 15 && @ThreeWay_Valve_State == 0 && #compRunTime > 30 then
