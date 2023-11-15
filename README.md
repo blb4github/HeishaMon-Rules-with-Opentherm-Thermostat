@@ -150,7 +150,7 @@ This function sets the quiet mode based on a combination of the current time and
 > [!IMPORTANT]  
 > Using this function will enable quiet mode which might impact your power usage and the performance of your heatpump. To overcome this quiet mode can be swiched on/off by softStart function, see that function for more details.
 
-on setSilentMode is called by timer 1 
+`on setSilentMode` is called by timer 1. The output is `#silentMode` [0, 1, 2, or 3] depending on outside temperature and time of day. `on setSilentMode` calls `on setQuietmode` which will set `@SetQuietMode` to `#silentMode` or '#mildMode' depending on `softStart` function active or not.
 
 <details>
 
