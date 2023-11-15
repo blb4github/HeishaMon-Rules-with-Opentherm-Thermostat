@@ -62,13 +62,13 @@ This is the first section of the ruleset. Here you can configure some settings a
 
 The second part of the global variables are mostly helpers. Where possible the are defaulted to `-1` so you can monitor the results of the functions easily. There are 2 variables you have to set to your requirements:
 
-#legionellaRunDay = [1..7] defines the day a legionellarun will be performed (1 is
+`#legionellaRunDay` = [1..7] defines the day a legionellarun will be performed (1 is
  Sunday, 7 is Saturday);
 
-#maxPumpDuty = xx defines the maxPumpDuty to be used as start during Heat run;
+`#maxPumpDuty` = xx defines the maxPumpDuty to be used as start during Heat run;
 
 
-At the end the first & second timers, `1` & `2`, are set to run after 60 respecively 10 seconds. These timers are also set in this block. The first timer is the global timer that recurs every 15 seconds to handle all the main functions. The second timer is a time reference which is set every minute to be used in other functions.
+At the end the first & second timers, `1` & `2`, are set to run after 60 respecively 10 seconds. These timers are also set in this block. The first timer is the global timer that recurs every 15 seconds to handle all the main functions. The second timer is a time reference which is set every minute to be used in other functions. In the System#Boot loop timer `1` is triggered after 60 seconds to give time to fill all variables from HP, OT and 1W.
 
 <details>
 
@@ -84,6 +84,9 @@ on System#Boot then
 	#allowSyncOT = 1;
 	#allowWAR = 1;
 
+	#legionellaRunDay = 7;
+	#maxPumpDuty = 85;
+
 	#chEnable = -1;
 	#chEnableOffTime = -1;
 	#chEnableTimeOff = -1;
@@ -94,9 +97,7 @@ on System#Boot then
 	#DHWRun = -1;
 	#firstBoot = 1;
 	#heatPumpState = -1;
-	#legionellaRunDay = 7;
 	#mainTargetTemp = -1;
-	#maxPumpDuty = 85;
 	#maxTa = -1;
 	#mildMode = -1;
 	#operatingMode = -1;
@@ -105,7 +106,7 @@ on System#Boot then
 	#prevOperatingMode = -1;
 	#quietMode = -1;
 	#roomTempDelta = -1;
-	#softStartCorrection = 0;
+	#softStartCorrection = -1;
 	#softStartPhase = -1;
 	#thermostatState = -1;
 	#timeRef = -1;
@@ -118,6 +119,7 @@ on timer=1 then
 		#firstBoot = 0;
 		#heatPumpState = @Heatpump_State;
 		#operatingMode = @Operating_Mode_State;
+		#softStartCorrection = 0;
 		compressorFreq();
 		calculateWAR();
 		syncOpenTherm();
@@ -141,12 +143,14 @@ end
 </details>
 
 
-### setSilentMode
+### setSilentMode (on setQuietMode, on setSilentMode & on timer=3)
 
 This function sets the quiet mode based on a combination of the current time and the value of `@Outside_Temp`. It will limit the frequency of the compressor and the fan speed, reducing the noice from the Heat Pump with reducing the power and efficiency of the Heat Pump as trade off. On the other hand it will help the heatpump running more stable and in low frequencies and reach low frequencies earlier than without QM.
 
 > [!IMPORTANT]  
 > Using this function will enable quiet mode which might impact your power usage and the performance of your heatpump. To overcome this quiet mode can be swiched on/off by softStart function, see that function for more details.
+
+on setSilentMode is called by timer 1 
 
 <details>
 
