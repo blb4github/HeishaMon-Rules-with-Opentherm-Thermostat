@@ -54,15 +54,21 @@ Special thanks to [@CurlyMoo](https://github.com/CurlyMoo) for all rules functio
 
 ## Instructions
 
-You can pick and mix the functions you like. To start you always need the [`System#Boot`](#on-systemboot) section, this is where the basics are configured.
+You can pick the functions you like. To start you always need the [`System#Boot`](#on-systemboot) section, this is where the basics are configured. Als `timer 1` and `timer 2` are part of the basic setup.
 
 ### on System#Boot
 
 This is the first section of the ruleset. Here you can configure some settings and are global variables defined. Default all functions are enabled (the `#allow*` variables), you can disable them by setting `1` to `0`.
 
-The second part of the global variables are mostly helpers. Where possible the are defaulted to `-1` so you can monitor the results of the functions easily.
+The second part of the global variables are mostly helpers. Where possible the are defaulted to `-1` so you can monitor the results of the functions easily. There are 2 variables you have to set to your requirements:
 
-At the end the first & second timers, `1` & `2`, are set to run after 15 respecively 10 seconds. These timers are also set in this block. The first timer is the global timer that recurs every 15 seconds to handle all the main functions. The second timer is a time reference which is set every minute to be used in other functions.
+#legionellaRunDay = [1..7] defines the day a legionellarun will be performed (1 is
+ Sunday, 7 is Saturday);
+
+#maxPumpDuty = xx defines the maxPumpDuty to be used as start during Heat run;
+
+
+At the end the first & second timers, `1` & `2`, are set to run after 60 respecively 10 seconds. These timers are also set in this block. The first timer is the global timer that recurs every 15 seconds to handle all the main functions. The second timer is a time reference which is set every minute to be used in other functions.
 
 <details>
 
