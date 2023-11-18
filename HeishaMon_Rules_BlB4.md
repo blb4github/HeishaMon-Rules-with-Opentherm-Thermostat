@@ -8,6 +8,9 @@ on System#Boot then
 	#allowSyncOT = 1;
 	#allowWAR = 1;
 
+	#legionellaRunDay = 7;
+	#maxPumpDuty = 85;
+
 	#chEnable = -1;
 	#chEnableOffTime = -1;
 	#chEnableTimeOff = -1;
@@ -18,10 +21,7 @@ on System#Boot then
 	#DHWRun = -1;
 	#firstBoot = 1;
 	#heatPumpState = -1;
-	#heatSeason = 1;
-	#legionellaRunDay = 7;
 	#mainTargetTemp = -1;
-	#maxPumpDuty = 85;
 	#maxTa = -1;
 	#mildMode = -1;
 	#operatingMode = -1;
@@ -30,7 +30,7 @@ on System#Boot then
 	#prevOperatingMode = -1;
 	#quietMode = -1;
 	#roomTempDelta = -1;
-	#softStartCorrection = 0;
+	#sSC = -1;
 	#softStartPhase = -1;
 	#thermostatState = -1;
 	#timeRef = -1;
@@ -38,7 +38,7 @@ on System#Boot then
 	setTimer(2,10);
 end
 
-on setQuietMode then
+on quietMode then
 	if #mildMode > -1 then
 		#quietMode = #mildMode;
 	else
@@ -57,19 +57,19 @@ on softStart then
 	if #allowSoftStart == 1 && #compState == 1 then
 		if #compRunTime < 3 then
 			#softStartPhase = 1;
-			#softStartCorrection = @Main_Outlet_Temp - #chSetpoint;
+			#sSC = @Main_Outlet_Temp - #chSetpoint;
 		else
 			if #compRunTime < 120 then
 				#softStartPhase = 2;
 				if @Compressor_Freq < 22 then
-					#softStartCorrection = @Main_Outlet_Temp - #chSetpoint;
+					#sSC = @Main_Outlet_Temp - #chSetpoint;
 				else
 					if #chSetpoint <= @Main_Outlet_Temp then
-						#softStartCorrection = @Main_Outlet_Temp - 0.7 - #chSetpoint;
+						#sSC = @Main_Outlet_Temp - 0.7 - #chSetpoint;
 					end
 				end
 				if #chSetpoint > @Main_Outlet_Temp then
-					#softStartCorrection = @Main_Outlet_Temp + 1 - #chSetpoint;
+					#sSC = @Main_Outlet_Temp + 1 - #chSetpoint;
 				end
 			else
 				if #softStartPhase == 2 then
@@ -78,62 +78,60 @@ on softStart then
 				end
 			end
 		end
-		if #softStartCorrection > 5 then
-			#softStartCorrection = 5;
+		if #sSC > 5 then
+			#sSC = 5;
 		end
-		if #softStartCorrection < -5 then
-			#softStartCorrection = -5;
+		if #sSC < -5 then
+			#sSC = -5;
 		end
-		if @Compressor_Freq > 18 && @Compressor_Freq < 26 then
+		#mainTargetTemp = #chSetpoint + #sSC;
+		if #mainTargetTemp < 27 then
+			#mainTargetTemp = 27;
+		end
+		if #mainTargetTemp > 40 then
+			#mainTargetTemp = 40;
+		end
+		#mainTargetTemp = floor(#mainTargetTemp);
+		if #mainTargetTemp + 2 < @Main_Outlet_Temp then
+			#mainTargetTemp = #mainTargetTemp + 1;
+		end
+		if @Compressor_Freq > 18 && @Compressor_Freq < 25 then
 			#mildMode = 0;
-			setQuietMode();
+			quietMode();
 		end
-	end
-	if #allowSoftStart == 1 && #compState == -5 then
-		#softStartCorrection = #mainTargetTemp - #chenable;
+	else
+		#sSC = 0;
 	end
 end
 
 on OTThermostat then
-	if #thermostatState == 1 then
-		if #allowOTThermostat == 1 && #DHWRun < 1 then
-			if @ThreeWay_Valve_State == 0 then
-				if ?chSetpoint > 9 then
-					#chSetpoint = ?chSetpoint;
-					if #chSetpoint < 30 && #compState == 0 then
-						#chSetpoint = 30;
-					end
-					if #chSetpoint < 27 && #compState == 1 then
-						#chSetpoint = 27;
-					end
-					if #chSetpoint > #maxTa then
-						#chSetpoint = #maxTa;
-					end
+	if #allowOTThermostat == 1 && #DHWRun < 1 && @ThreeWay_Valve_State == 0 then
+		if #thermostatState == 1 then
+			if ?chSetpoint > 9 then
+				#chSetpoint = ?chSetpoint;
+				if #chSetpoint < 30 && #chEnable == 1 && #compState == 0 then
+					#chSetpoint = 30;
 				end
-				softStart();
-				#mainTargetTemp = #chSetpoint + #softStartCorrection;
-				if #mainTargetTemp < 27 then
-					#mainTargetTemp = 27;
+				if #chSetpoint < 27 && #compState == 1 then
+					#chSetpoint = 27;
 				end
-				if #mainTargetTemp > 40 then
-					#mainTargetTemp = 40;
+				if #chSetpoint > #maxTa then
+					#chSetpoint = #maxTa;
 				end
-				#mainTargetTemp = floor(#mainTargetTemp);
-				if #compState == 1 then
-					if #mainTargetTemp + 2 < @Main_Outlet_Temp then
-						#mainTargetTemp = #mainTargetTemp + 1;
-					end
-					#roomTempDelta = ?roomTempSet - ?roomTemp;
-					if #roomTempDelta > 1 && #chEnableOffTime > 15 && @ThreeWay_Valve_State == 0 && #compRunTime > 30 then
-						#mainTargetTemp = round(@Main_Outlet_Temp - 10);
-					end
+			end
+			#mainTargetTemp = #chSetpoint;
+			softStart();
+			if #compState == 1 then
+				#roomTempDelta = ?roomTempSet - ?roomTemp;
+				if #roomTempDelta > 0.5 && #chEnableOffTime > 15 && @ThreeWay_Valve_State == 0 && #compRunTime > 30 then
+					#mainTargetTemp = round(@Main_Outlet_Temp - 10);
 				end
-				if @Z1_Heat_Request_Temp != #mainTargetTemp then
-					@SetZ1HeatRequestTemperature = #mainTargetTemp;
-				end
-				if @Heatpump_State != 1 && #chEnable == 1 then
-					@SetHeatpump = 1;
-				end
+			end
+			if @Z1_Heat_Request_Temp != #mainTargetTemp then
+				@SetZ1HeatRequestTemperature = #mainTargetTemp;
+			end
+			if @Heatpump_State != 1 && #chEnable == 1 then
+				@SetHeatpump = 1;
 			end
 			if #chEnableOffTime > 30 && @ThreeWay_Valve_State == 0 && (#compRunTime > 30 || #compState == 0) && @Outside_Temp > 2 then
 				@SetHeatpump = 0;
@@ -142,42 +140,45 @@ on OTThermostat then
 				#allowOTThermostat = 0;
 				setTimer(7,25);
 			end
+		else
+			#mainTargetTemp = #maxTA;
+			if @Z1_Heat_Request_Temp != #mainTargetTemp then
+				@SetZ1HeatRequestTemperature = #mainTargetTemp;
+			end
+			if (%hour > 22 || %hour < 7) && @Heatpump_State == 1 then
+				@SetHeatpump = 0;
+			end
+			if (%hour < 23 || %hour > 6) && @Heatpump_State == 0 then
+				@SetHeatpump = 1;
+			end
+			#allowOTThermostat = 0;
+			setTimer(7,55);
 		end
-	else
-		#mainTargetTemp = #maxTA;
-		if (%hour > 22 || %hour < 7) && @Heatpump_State == 1 then
-			@SetHeatpump = 0;
-		end
-		if (%hour < 23 || %hour > 6) && @Heatpump_State == 0 then
-			@SetHeatpump = 1;
-		end
-		#allowOTThermostat = 0;
-		setTimer(7,55);
 	end
 end
 
-on checkDHW then
+on DHW then
 	if #allowDHW == 1 then
 		#allowDHW = 0;
 		if @ThreeWay_Valve_State == 0 && (@DHW_Temp < 39 || (%hour == 13 && (%day == #LegionellaRunDay || @DHW_Temp < @DHW_Target_Temp + @DHW_Heat_Delta))) then
+			#DHWRun = 1;
 			#prevOperatingMode = @Operating_Mode_State;
 			#prevHeatPumpState = @Heatpump_State;
-			@SetOperationMode = 3;
+			@SetOperationMode = 4;
 			if @Heatpump_State != 1 then
 				@SetHeatpump = 1;
-			end 
-			if %day == #legionellaRunDay && %hour == 13 then
+			end
+			if %day == #legionellaRunDay && %hour >= 13 && @DHW_Temp > 47 && @Sterilization_State != 1 then
 				@SetForceSterilization = 1;
 			end
-			#DHWRun = 1;
 		end
 		if #DHWRun == 1 then
-			if @ThreeWay_Valve_State == 0 && @DHW_Temp > 49 then
+			if @ThreeWay_Valve_State == 0 && @DHW_Temp >= @DHW_Target_Temp && @Defrosting_State == 0 && @Sterilization_State == 0 then
 				@SetOperationMode = #prevOperatingMode;
 				if @Heatpump_State != #prevHeatPumpState then
 					@SetHeatpump = #prevHeatPumpState;
 				end
-				#prevOperatingMode = 3;
+				#prevOperatingMode = 4;
 				#prevHeatPumpState = 1;
 				#DHWRun = -1;
 			end
@@ -186,7 +187,7 @@ on checkDHW then
 	end
 end
 
-on setMaxPumpDuty then
+on maxPumpDuty then
 	if #allowPumpSpeed == 1 then
 		#allowPumpSpeed = 0;
 		if @ThreeWay_Valve_State == 1 then
@@ -233,7 +234,7 @@ on setMaxPumpDuty then
 	end
 end
 
-on setSilentMode then
+on silentMode then
 	if #allowSilentMode == 1 then
 		#allowSilentMode = 0;
 		if @Outside_Temp > 9 then
@@ -252,7 +253,7 @@ on setSilentMode then
 			end
 		end
 		setTimer(3, 900);
-		setQuietMode();
+		quietMode();
 	end
 end
 
@@ -263,7 +264,7 @@ on syncOpenTherm then
 		?outsideTemp = @Outside_Temp;
 		?dhwTemp = @DHW_Temp;
 		?dhwSetpoint = @DHW_Target_Temp;
-		if isset(?chEnable) && isset(?chSetpoint) && isset(?roomTempSet) && isset(?roomTemp) then
+		if isset(?chEnable) && isset(?chSetpoint) && isset(?roomTempSet) && isset(?roomTemp) && ?roomTempSet != 0 && ?roomTemp != 0 then
 			#thermostatState = 1;
 		end
 		if ?chEnable == 1 then
@@ -305,7 +306,7 @@ on syncOpenTherm then
 	end
 end
 
-on calculateWAR then
+on WAR then
 	if #allowWAR == 1 then
 		#allowWAR = 0;
 		$Ta1 = @Z1_Heat_Curve_Target_Low_Temp;
@@ -324,7 +325,7 @@ on calculateWAR then
 	end
 end
 
-on compressorFreq then
+on compFreq then
 	if @Compressor_Freq > 18 then
 		if #compState < 1 then
 			#compStartTime = #timeRef;
@@ -338,17 +339,17 @@ on compressorFreq then
 		#compState = 0;
 		#compStartTime = -1;
 		#compRunTime = -1;
-		#softStartCorrection = 0;
+		#sSC = 0;
 		#softStartPhase = -1;
 		if #mildMode != #silentMode && #mildMode != -1 && #silentMode != 1 then
 			#mildMode = #silentMode;
-			setQuietMode();
+			QuietMode();
 		end
 	end
 end
 
 on @Compressor_Freq then
-	compressorFreq();
+	compFreq();
 end
 
 on timer=1 then
@@ -356,15 +357,16 @@ on timer=1 then
 		#firstBoot = 0;
 		#heatPumpState = @Heatpump_State;
 		#operatingMode = @Operating_Mode_State;
-		compressorFreq();
-		calculateWAR();
+		#sSC = 0;
+		compFreq();
+		WAR();
 		syncOpenTherm();
 	else
-		calculateWAR();
-		setSilentMode();
+		WAR();
+		silentMode();
 		syncOpenTherm();
-		setMaxPumpDuty();
-		checkDHW();
+		pumpDuty();
+		DHW();
 		OTThermostat();
 	end
 	setTimer(1,15);
@@ -396,8 +398,8 @@ on timer=7 then
 end
 
 on timer=8 then
-	if #softStartCorrection > 1 then
-		#softStartCorrection = #softStartCorrection - 1;
+	if #sSC > 1 then
+		#sSC = #sSC - 1;
 		setTimer(8,900);
 	end
 end
