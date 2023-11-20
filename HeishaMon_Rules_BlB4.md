@@ -99,8 +99,6 @@ on softStart then
 			#mildMode = 0;
 			quietMode();
 		end
-	else
-		#sSC = 0;
 	end
 end
 
@@ -108,7 +106,11 @@ on OTThermostat then
 	if #allowOTThermostat == 1 && #DHWRun < 1 && @ThreeWay_Valve_State == 0 then
 		if #thermostatState == 1 then
 			if ?chSetpoint > 9 then
-				#chSetpoint = ?chSetpoint;
+				if ?chSetpoint < 20 then
+					#chSetpoint = 20;
+				else
+					#chSetpoint = ?chSetpoint;
+				end
 				if #chSetpoint < 30 && #chEnable == 1 && #compState == 0 then
 					#chSetpoint = 30;
 				end
@@ -129,12 +131,15 @@ on OTThermostat then
 			end
 			if @Z1_Heat_Request_Temp != #mainTargetTemp then
 				@SetZ1HeatRequestTemperature = #mainTargetTemp;
+				$mTT1 = #mainTargetTemp;
 			end
 			if @Heatpump_State != 1 && #chEnable == 1 then
 				@SetHeatpump = 1;
 			end
 			if #chEnableOffTime > 30 && @ThreeWay_Valve_State == 0 && (#compRunTime > 30 || #compState == 0) && @Outside_Temp > 2 then
 				@SetHeatpump = 0;
+				#allowOTThermostat = 0;
+				setTimer(7,600);
 			end
 			if #softStartPhase == -1 || #softStartPhase > 1 then
 				#allowOTThermostat = 0;
@@ -368,6 +373,7 @@ on timer=1 then
 		pumpDuty();
 		DHW();
 		OTThermostat();
+		$mTT2 = #mainTargetTemp;
 	end
 	setTimer(1,15);
 end
