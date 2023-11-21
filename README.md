@@ -93,6 +93,8 @@ on System#Boot then
 	#allowSyncOT = 1;
 	#allowWAR = 1;
 
+	#debug = 1;
+
 	#legionellaRunDay = 7;
 	#maxPumpDuty = 85;
 
@@ -110,7 +112,6 @@ on System#Boot then
 	#maxTa = -1;
 	#mildMode = -1;
 	#operatingMode = -1;
-	#prevDHWHeatDelta = -1;
 	#prevHeatPumpState = -1;
 	#prevOperatingMode = -1;
 	#quietMode = -1;
@@ -139,6 +140,22 @@ on timer=1 then
 		pumpDuty();
 		DHW();
 		OTThermostat();
+		if #debug == 1 then
+			$chEnable = #chEnable;
+			$chEnableTimeOff = #chEnableTimeOff;
+			$chSetPoint = #chSetPoint;
+			$compRunTime = #compRunTime;
+			$compState = #compState;
+			$maxTa = #maxTa;
+			$mildMode = #mildMode;
+			$quietMode = #quietMode;
+			$roomTempDelta = #roomTempDelta;
+			$sSC = #sSC;
+			$softStartPhase = #softStartPhase;
+			$thermostatState = #thermostatState;
+			$mainTargetTemp = #mainTargetTemp;
+			$maxPumpDuty = #maxPumpDuty;
+		end
 	end
 	setTimer(1,15);
 end
@@ -196,7 +213,7 @@ on softStart then
 			#softStartPhase = 1;
 			#sSC = @Main_Outlet_Temp - #chSetpoint;
 		else
-			if #compRunTime < 120 then
+			if #compRunTime < 180 then
 				#softStartPhase = 2;
 				if @Compressor_Freq < 22 then
 					#sSC = @Main_Outlet_Temp - #chSetpoint;
@@ -236,10 +253,8 @@ on softStart then
 			#mildMode = 0;
 			quietMode();
 		end
-	else
-		#sSC = 0;
 	end
-end		
+end	
 						
 on timer=3 then						
 	#allowSilentMode = 1;					
@@ -280,7 +295,11 @@ on OTThermostat then
 	if #allowOTThermostat == 1 && #DHWRun < 1 && @ThreeWay_Valve_State == 0 then
 		if #thermostatState == 1 then
 			if ?chSetpoint > 9 then
-				#chSetpoint = ?chSetpoint;
+				if ?chSetpoint < 20 then
+					#chSetpoint = 20;
+				else
+					#chSetpoint = ?chSetpoint;
+				end
 				if #chSetpoint < 30 && #chEnable == 1 && #compState == 0 then
 					#chSetpoint = 30;
 				end
@@ -295,18 +314,21 @@ on OTThermostat then
 			softStart();
 			if #compState == 1 then
 				#roomTempDelta = ?roomTempSet - ?roomTemp;
-				if #roomTempDelta > 0.5 && #chEnableOffTime > 15 && @ThreeWay_Valve_State == 0 && #compRunTime > 30 then
+				if ((#roomTempDelta > 0.5 && #chEnable == 0) || #chEnableOffTime > 15) && @ThreeWay_Valve_State == 0 && #compRunTime > 30 then
 					#mainTargetTemp = round(@Main_Outlet_Temp - 10);
 				end
 			end
 			if @Z1_Heat_Request_Temp != #mainTargetTemp then
 				@SetZ1HeatRequestTemperature = #mainTargetTemp;
+				$mTT1 = #mainTargetTemp;
 			end
 			if @Heatpump_State != 1 && #chEnable == 1 then
 				@SetHeatpump = 1;
 			end
 			if #chEnableOffTime > 30 && @ThreeWay_Valve_State == 0 && (#compRunTime > 30 || #compState == 0) && @Outside_Temp > 2 then
 				@SetHeatpump = 0;
+				#allowOTThermostat = 0;
+				setTimer(7,600);
 			end
 			if #softStartPhase == -1 || #softStartPhase > 1 then
 				#allowOTThermostat = 0;
@@ -428,7 +450,7 @@ As a saveguard a check is performed to avoid maxPumpDuty will be above 140 (duri
 <summary>maxPumpDuty</summary>
 
 ```LUA
-on maxPumpDuty then
+on pumpDuty then
 	if #allowPumpSpeed == 1 then
 		#allowPumpSpeed = 0;
 		if @ThreeWay_Valve_State == 1 then
