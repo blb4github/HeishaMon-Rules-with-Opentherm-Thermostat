@@ -39,6 +39,13 @@ on System#Boot then
 	setTimer(2,10);
 end
 
+on mildMode then
+		if #mildMode != #silentMode && #mildMode != -1 && #silentMode != 1 then
+			#mildMode = #silentMode;
+			quietMode();
+		end
+end
+
 on quietMode then
 	if #mildMode > -1 then
 		#quietMode = #mildMode;
@@ -347,15 +354,18 @@ on compFreq then
 		#compRunTime = -1;
 		#sSC = 0;
 		#softStartPhase = -1;
-		if #mildMode != #silentMode && #mildMode != -1 && #silentMode != 1 then
-			#mildMode = #silentMode;
-			QuietMode();
-		end
+		mildMode();
 	end
 end
 
 on @Compressor_Freq then
 	compFreq();
+end
+
+on @Defrosting_State then
+	if @Defrosting_State == 1 then
+		mildMode();
+	end
 end
 
 on timer=1 then
