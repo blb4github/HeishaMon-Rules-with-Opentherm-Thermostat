@@ -12,6 +12,7 @@ on System#Boot then
 
 	#legionellaRunDay = 7;
 	#maxPumpDuty = 85;
+	#maxTa = 40;
 
 	#chEnable = -1;
 	#chEnableOffTime = -1;
@@ -24,7 +25,6 @@ on System#Boot then
 	#firstBoot = 1;
 	#heatPumpState = -1;
 	#mainTargetTemp = -1;
-	#maxTa = -1;
 	#mildMode = -1;
 	#operatingMode = -1;
 	#prevHeatPumpState = -1;
@@ -39,12 +39,6 @@ on System#Boot then
 	setTimer(2,10);
 end
 
-on mildMode then
-		if #mildMode != #silentMode && #mildMode != -1 && #silentMode != 1 then
-			#mildMode = #silentMode;
-			quietMode();
-		end
-end
 
 on quietMode then
 	if #mildMode > -1 then
@@ -329,7 +323,8 @@ on WAR then
 		if @Outside_Temp >= $Tb1 then
 			#maxTa = $Ta1;
 		else
-			if @Outside_Temp <= $Tb2 then	#maxTa = $Ta2;
+			if @Outside_Temp <= $Tb2 then
+				#maxTa = $Ta2;
 			else
 				#maxTa = 1 + floor(0.9 + $Ta1 + (($Tb1 - @Outside_Temp) * ($Ta2 - $Ta1) / ($Tb1 - $Tb2)));
 			end
@@ -338,8 +333,15 @@ on WAR then
 	end
 end
 
+on mildMode then
+		if #mildMode != #silentMode && #mildMode != -1 && #silentMode != 1 then
+			#mildMode = #silentMode;
+			quietMode();
+		end
+end
+
 on compFreq then
-	if @Compressor_Freq > 18 then
+	if @Compressor_Freq > 18 || #firstBoot == 1 then
 		if #compState < 1 then
 			#compStartTime = #timeRef;
 			#compState = 1;
@@ -370,13 +372,13 @@ end
 
 on timer=1 then
 	if #firstBoot == 1 then
-		#firstBoot = 0;
 		#heatPumpState = @Heatpump_State;
 		#operatingMode = @Operating_Mode_State;
 		#sSC = 0;
 		compFreq();
 		WAR();
 		syncOpenTherm();
+		#firstBoot = 0;
 	else
 		WAR();
 		silentMode();
