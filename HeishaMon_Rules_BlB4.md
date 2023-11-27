@@ -81,20 +81,35 @@ on softStart then
 				if #sSP == 2 then	#sSP = 3;	setTimer(8,5);	end
 			end
 		end
-		if #sSC > 5 then	#sSC = 5;	end
-		if #sSC < -7 then	#sSC = -7;	end
+		if #sSC > 5 then
+			#sSC = 5;
+		end
+		if #sSC < -7 then
+			#sSC = -7;
+		end
 		#mTT = $chSP + #sSC;
-		if #mTT < 24 then	#mTT = 24;	end
-		if #mTT > 40 then	#mTT = 40;	end
+		if #mTT < 24 then
+			#mTT = 24;
+		end
+		if #mTT > 40 then
+			#mTT = 40;
+		end
 		#mTT = floor(#mTT);
-		if (#mTT + 2) < $mOT then	#mTT = #mTT + 1;	end
+		if (#mTT + 2) < $mOT then
+			#mTT = #mTT + 1;
+		end
 		if @Compressor_Freq > 18 && @Compressor_Freq < 25 then
 			#mildMode = 0;
 			quietMode();
 		end
-		if #compRunTime < 8 then	$dH = #deltaHeat - 2;
-		else	$dH = #deltaHeat;	end
-		if @Heat_Delta != $dH then	@SetFloorHeatDelta = $dH;	end
+		if #compRunTime < 8 then
+			$dH = #deltaHeat - 2;
+		else
+			$dH = #deltaHeat;
+		end
+		if @Heat_Delta != $dH then
+			@SetFloorHeatDelta = $dH;
+		end
 	end
 end
 
