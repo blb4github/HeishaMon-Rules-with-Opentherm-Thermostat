@@ -1,6 +1,6 @@
 ```LUA
 on System#Boot then
-	print('BLB Heishamon_rules20241126i.txt');
+	print('BLB Heishamon_rules20241127.txt');
 	#allowDHW = 1;
 	#allowOTT = 1;
 	#allowTaShift = 1;
