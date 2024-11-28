@@ -1,6 +1,6 @@
 ```LUA
 on System#Boot then
-	print('BLB Heishamon_rules20241127.txt');
+	print('BLB Heishamon_rules20241129b.txt');
 	#allowDHW = 1;
 	#allowOTT = 1;
 	#allowTaShift = 1;
@@ -23,7 +23,6 @@ on System#Boot then
 	#Heat = -1;
 	#HPStateP = -1;
 	#HPStateR = -1;
-	#LegionellaRunDay = 7;
 	#MaxPumpDuty = -1;
 	#MOT = -1;
 	#OMP = -1;
@@ -34,6 +33,7 @@ on System#Boot then
 	#RoomTempSet = -1;
 	#RoomTempControl = -1;
 	#SHifT = -1;
+	#SterilizationDay = 7;
 	#Time = -1;
 	#SoftStartControl = -1;
 	setTimer(1,60);
@@ -41,7 +41,7 @@ on System#Boot then
 end
 
 on TaShift then
-	#allowTaShift = #allowTaShift + 1;
+	if #allowTaShift > 0 then #allowTaShift = #allowTaShift + 1;end
 	if #allowTaShift > 20 then #allowTaShift = 2;end
 	if (#CompRunTime < 15 || #allowTaShift == 2) && #DHWRun < 1 && @ThreeWay_Valve_State == 0 then
 		#SHifT = @Z1_Heat_Request_Temp;
@@ -87,8 +87,7 @@ on TaShift2 then
 		$a = 4;$b =', TaShift Finished';
 	end
 	#MOT = @Main_Outlet_Temp;
-	$multiplier = -3;
-	#RoomTempControl = round(#RoomTempDelta * $multiplier);
+	#RoomTempControl = round(#RoomTempDelta * -3);
 	#SHifT = #SoftStartControl + #RoomTempControl;
 
 	if $a > 1 && (@Main_Outlet_Temp - $WarTemp - #SHifT) > 1.8 then
@@ -135,11 +134,11 @@ end
 on DHW then
 	if #allowDHW == 1 && #RemoteOverRide < 4 then
 		#allowDHW = 2;
-		if @ThreeWay_Valve_State == 0 && (@DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta - 5) || (%hour == 13 && (%day == #LegionellaRunDay || @DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta)))) then
+		if @ThreeWay_Valve_State == 0 && (@DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta - 10) || (%hour > 9 && @DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta - 5)) || (%hour == 13 && (%day == #SterilizationDay || @DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta)))) then
 			#DHWRun = 1;
 			#OMP = @Operating_Mode_State;
 			#HPStateP = @Heatpump_State;
-			if #OMP == 0 then 
+			if #OMP == 0 then
 				#OMR = 4;
 			elseif #OMP == 1 then
 				#OMR = 5;
@@ -151,22 +150,21 @@ on DHW then
 			HeatPumpState('DHWon');
 		end
 		if #DHWRun > 0 then
-			if %day > 5 && %hour > 10 && @DHW_Temp > 47 && @Sterilization_State != 1 then
+			if %day > (#SterilizationDay - 2) && %hour > 10 && @DHW_Temp > 47 && @Sterilization_State != 1 then
 				@SetForceSterilization = 1;
-				#LegionellaRunDay = 8;
+				#SterilizationDay = #SterilizationDay + 10;
 			end
 			if @ThreeWay_Valve_State == 0 && @DHW_Temp >= @DHW_Target_Temp && @Defrosting_State == 0 && @Sterilization_State == 0 then
-				@SetOperationMode = max(0, #OMP);
-				if @Heatpump_State != #HPStateP then
-					#HPStateR = #HPStateP;
-					HeatPumpState('DHWoff');
-				end
+				#OMR = max(0,#OMP);
 				#OMP = @Operating_Mode_State;
+				OperatingMode();
+				#HPStateR = #HPStateP;
+				HeatPumpState('DHWoff');
 				#HPStateP = 1;
 				#DHWRun = 0;
 			end
 		end
-		if %day == 7 && #LegionellaRunDay == 8 then #LegionellaRunDay = 7;end
+		if %day == (#SterilizationDay - 10) then #SterilizationDay = #SterilizationDay - 10;end
 		setTimer(6,900);
 	end
 end
@@ -302,11 +300,11 @@ on @Compressor_Freq then
 end
 
 on @Main_Outlet_Temp then
-	#allowTaShift = 1;
+	if #allowTaShift > 0 then #allowTaShift = 1;end
 end
 
 on @Z1_Water_Target_Temp then
-	#allowTaShift = 1;
+	if #allowTaShift > 0 then #allowTaShift = 1;end
 end
 
 on timer=1 then
