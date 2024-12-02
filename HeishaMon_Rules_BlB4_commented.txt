@@ -11,24 +11,24 @@ d) Honeywell Evohome & OpenTherm Gateway integration in Home Assistant to commun
 e) Settings Heat Pump: Operating_Mode_State: 0, Heating_Mode: 0, Cooling_Mode: 1, Buffer_Installed: 0, DHW_Installed: 1, Pump_Flowrate_Mode: 0, Optional_PCB: 0, Z1_Sensor_Settings: 0
 
 **My Requirements for the Rules Set:**
-1)	Max Pump Speed based on HP status 1) DHW, 2) HEAT/COOL (and the outside temp as well), IDLE flow;
-2)	QuiteMode based on time (e.g. at night) & for Heat/Cool at start Compressor until Compressor Frequency < 30 Hz.;
-3)	DHW production if DHWTemp is (too) low, every day at fixed time if DHWTemp < DHWTargetTemp + DHWDelta and 1 x per week (at #SterilizationDay) a Sterilization run;
-4)	Sync OT values with HP values to have correct (status) values from HP communicated to OT Thermostat;
-5)	OT Thermostat HP control: 1) switch off HP (water circulation pump) when ?chEnable is 0 (for a certain time) or room temperature too high;
-6)	TaShift function to 1) lower Compressor frequency asap by lowering Ta and increasing HeatDelta, 2) extend the run time if Heat loss is less than minimum HP Power and 3) adapt Ta based on RoomTempDelta.
-7)	Remoteoverride function to selectively swith off some functions via Home Assistant;
+1) Max Pump Speed based on HP status 1) DHW, 2) HEAT/COOL (and the outside temp as well), IDLE flow;
+2) QuiteMode based on time (e.g. at night) & for Heat/Cool at start Compressor until Compressor Frequency < 30 Hz.;
+3) DHW production if DHWTemp is (too) low, every day at fixed time if DHWTemp < DHWTargetTemp + DHWDelta and 1 x per week (at #SterilizationDay) a Sterilization run;
+4) Sync OT values with HP values to have correct (status) values from HP communicated to OT Thermostat;
+5) OT Thermostat HP control: 1) switch off HP (water circulation pump) when ?chEnable is 0 (for a certain time) or room temperature too high;
+6) TaShift function to 1) lower Compressor frequency asap by lowering Ta and increasing HeatDelta, 2) extend the run time if Heat loss is less than minimum HP Power and 3) adapt Ta based on RoomTempDelta.
+7) Remoteoverride function to selectively swith off some functions via Home Assistant;
 
 **Remoteoverride**
 Purpose:	By default the HP is controlled by the rules, including switching on/off the HP. For safety and other reasons it's wise to be able to switch the HW off by the controller or via MQTT and to prevent the rules will switch the HP on again. For different reasons there could be reasons to switch off some functions on a relative easy remote way. This is implemented via the #Remoteoverride parameter which can be set/manipulated by the @SetZ2HeatRequestTemperature parameter, this parameter is not in use in my (1 zone) installation.
 
 functions NOT running with #Remoteoverride value:
--1:		HeatPumpState will not be changed (this is to prevent ruleset will modify HeatPumpState during e.g. maintenance
- 1:		TaShift
- 2:		TaShift, QuietMode
- 3:		TaShift, QuietMode, OpenThermThermostat
- 4:		TaShift, QuietMode, OpenThermThermostat, DHW
- 5:		TaShift, QuietMode, OpenThermThermostat, DHW, pumpDuty
+-1: HeatPumpState will not be changed (this is to prevent ruleset will modify HeatPumpState during e.g. maintenance
+ 1: TaShift
+ 2: TaShift, QuietMode
+ 3: TaShift, QuietMode, OpenThermThermostat
+ 4: TaShift, QuietMode, OpenThermThermostat, DHW
+ 5: TaShift, QuietMode, OpenThermThermostat, DHW, pumpDuty
 
 **System#Boot**
 *Purpose*: 1) define which functions are active (#allow variables), 2) initial values of global variable(s) used in the ruleset and 3) start 2 main timers, 1 for time & day references, the other one to trigger all acitve functions.
@@ -48,33 +48,33 @@ on System#Boot then
 	#allowSyncOT = 1;
 	
 	#chEnable = -1;						-- #chEnable is clean ?chEnable
-	#chEnableOffTime = -1;				-- Time ?chEnable goes off
-	#chEnableTimeOff = -1;				-- ?chEnable Off Timer (duration)
-	#CompFreqTarget = -1;				-- Compressor Frequency target (depending on outside temperature)
+	#chEnableOffTime = -1;					-- Time ?chEnable goes off
+	#chEnableTimeOff = -1;					-- ?chEnable Off Timer (duration)
+	#CompFreqTarget = -1;					-- Compressor Frequency target (depending on outside temperature)
 	#CompRunTime = -1;					-- Duration (in minutes) the compressor is running
 	#CompRunSec = -1;					-- Duration (in seconds) the compressor is running during start phase
 	#CompState = -1;					-- Compressor running state (0/1)
-	#CompStateChangeTime = -1;			-- Time the compressor started running
-	#Debug = 1;							-- Perform Debug actions (0 = off) depending on the debug level
+	#CompStateChangeTime = -1;				-- Time the compressor started running
+	#Debug = 1;						-- Perform Debug actions (0 = off) depending on the debug level
 	#DHWRun = -1;						-- DHWrun state (0/1)
 	#FirstBoot = 1;						-- 1 initiates boot up routine
-	#Heat = -1;							-- HP in OM which includes Heat
+	#Heat = -1;						-- HP in OM which includes Heat
 	#HeatDelta = 5;						-- HeatDelta (To - Tr temp difference)
 	#HPStateP = -1;						-- Previous Heat Pump state
 	#HPStateR = -1;						-- Required Heat Pump state
 	#MaxPumpDuty = -1;					-- Maximum Pumpduty value which fits my installation (~ 11l/m)
-	#MOT = -1;							-- Current Main Outlet Temperature (@Main_Outlet_Temp)
-	#OMP = -1;							-- Previous Operating Mode
+	#MOT = -1;						-- Current Main Outlet Temperature (@Main_Outlet_Temp)
+	#OMP = -1;						-- Previous Operating Mode
 	#OutsideTemp = -1;					-- OusideTemp is taken every 15 minutes to keep it stable
-	#OMR = -1;							-- Required Operating Mode
-	#QMR = -1;							-- Required Quiet Mode
-	#RemoteOverRide = -1;				-- Remote override value
-	#RoomTempDelta = -1;				-- Delta between Room Setpoint and Room Temp (positive = temp above setpoint)
-	#RoomTempControl = -1;				-- Shift Ta as result of #RoomTempDelta
+	#OMR = -1;						-- Required Operating Mode
+	#QMR = -1;						-- Required Quiet Mode
+	#RemoteOverRide = -1;					-- Remote override value
+	#RoomTempDelta = -1;					-- Delta between Room Setpoint and Room Temp (positive = temp above setpoint)
+	#RoomTempControl = -1;					-- Shift Ta as result of #RoomTempDelta
 	#SHifT = -1;						-- Shift Ta Temperature
-	#SterilizationDay = 7;				-- Day of the week the Sterilization Run must be performed (1 = Sunday, 7 = Saturday)
-	#Time = -1;							-- Current Time(formula: %day * 1440 + %hour * 60 + %minute)
-	#SoftStartControl = -1;				-- Shift Ta temperature for soft start control and run time extension. 
+	#SterilizationDay = 7;					-- Day of the week the Sterilization Run must be performed (1 = Sunday, 7 = Saturday)
+	#Time = -1;						-- Current Time(formula: %day * 1440 + %hour * 60 + %minute)
+	#SoftStartControl = -1;					-- Shift Ta temperature for soft start control and run time extension. 
 	setTimer(1,60);						-- main timer which calls all functions
 	setTimer(2,10);						-- timer for time reference
 end
