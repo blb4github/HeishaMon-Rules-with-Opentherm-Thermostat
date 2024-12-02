@@ -1,6 +1,6 @@
 ```LUA
 on System#Boot then
-	print('BLB Heishamon_rules20241202e.txt');
+	print('BLB Heishamon_rules20241202h.txt');
 	#allowDHW = 1;
 	#allowOTT = 1;
 	#allowTaShift = 1;
@@ -107,11 +107,8 @@ on TaShift2 then
 	if #Debug > 0 || #RemoteOverRide > 0 then	print('TaM phase ', $a, $b, ' CRS: ', #CompRunSec, ' CRT: ', #CompRunTime, ' RTD: ', #RoomTempDelta, ' SSC: ', #SoftStartControl, ' RTC: ', #RoomTempControl, ' SHifT: ', #SHifT, ' MOT: ', @Main_Outlet_Temp, ' Z1T: ',  @Z1_Water_Target_Temp);end
 end
 
-on HeatPumpState($a) then
-	if @Heatpump_State != #HPStateR && #RemoteOverRide != -1 then
-		print('HeatPumpState, origin: ', $a);
-		@SetHeatpump = #HPStateR;
-	end
+on HeatPumpState then
+	if @Heatpump_State != #HPStateR && #RemoteOverRide != -1 then @SetHeatpump = #HPStateR;end
 end
 
 on OperatingMode then
@@ -122,13 +119,13 @@ on OpenThermThermostat then
 	if #allowOTT == 1 && #RemoteOverRide < 3 && #DHWRun < 1 && @ThreeWay_Valve_State == 0 && @Defrosting_State == 0 then
 		if #chEnable == 1 && #RoomTempDelta < 0.3 then
 			#HPStateR = 1;
-			HeatPumpState('OTTon');
+			HeatPumpState();
 		end
 
 		if (#RoomTempDelta > 0.7 || #chEnableOffTime > 30 || (#chEnableOffTime > 15 && #CompressorRunTime < -15) || (#chEnableOffTime > 5 && %hour > 22)) && #3WayValve == 0 && (#CompressorRunTime > 60 || #CompressorState == 0) && #OutsideTemp > -5 then
 			if @ThreeWay_Valve_State == 0 && (#CompRunTime > 90 || #CompState == 0) && #OutsideTemp > -5 && #HPStateR != 0 then
 				#HPStateR = 0;
-				HeatPumpState('OTToff');
+				HeatPumpState();
 				if  @Operating_Mode_State != 0 then @SetOperationMode = 0;end
 				#allowOTT = 2;
 				setTimer(7,600);
@@ -157,7 +154,7 @@ on DHW then
 			end
 			OperatingMode();
 			#HPStateR = 1;
-			HeatPumpState('DHWon');
+			HeatPumpState();
 		end
 		if #DHWRun > 0 then
 			if %day > (#SterilizationDay - 2) && %hour > 10 && @DHW_Temp > 47 && @Sterilization_State != 1 then
@@ -169,7 +166,7 @@ on DHW then
 				#OMP = @Operating_Mode_State;
 				OperatingMode();
 				#HPStateR = #HPStateP;
-				HeatPumpState('DHWoff');
+				HeatPumpState();
 				#HPStateP = 1;
 				#DHWRun = 0;
 			end
@@ -277,8 +274,9 @@ on syncOT then
 			?chState = 0;
 			?dhwState = 0;
 		end
-		$RTD = max(min(?roomTempSet, 10), 22);
-		#RoomTempDelta = max(min(20 - $RTD, 5), -5);
+		$RoomSetpoint = min(max(?roomTempSet, 10), 22);
+		#RoomTempDelta = max(min(20 - $RoomSetpoint, 5), -5);
+		print('$RTS: ', $RoomSetpoint, ' #RTD: ', #RoomTempDelta);
 	end
 end
 
