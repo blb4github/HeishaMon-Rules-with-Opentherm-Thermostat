@@ -1,6 +1,6 @@
 ```LUA
 on System#Boot then
-	print('BLB Heishamon_rules20241202h.txt');
+	print('BLB Heishamon_rules20241202k.txt');
 	#allowDHW = 1;
 	#allowOTT = 1;
 	#allowTaShift = 1;
@@ -51,12 +51,13 @@ on TaShift then
 			if #Debug > 1 || #RemoteOverRide > 0 then	print('TaShift if Compressor is running');end
 			TaShift2();
 			if #allowHeatDelta == 1 then
+				$HD = -1;
 				if #CompRunTime > -1 && #CompRunTime < 3 then
 					$HD = #HeatDelta + 5;
-				elseif #CompRunTime > 20 then
+				elseif #CompRunTime > 20 && #CompRunTime < 25 then
 					$HD = #HeatDelta;
 				end
-				if @Heat_Delta != $HD && #allowHeatDelta == 1 then @SetFloorHeatDelta = $HD;end
+				if @Heat_Delta != $HD && $HD > 0 then @SetFloorHeatDelta = $HD;end
 			end
 		else
 			$StopTime = -2 * #OutsideTemp - 30;
@@ -79,7 +80,7 @@ end
 on TaShift2 then
 	$WarTemp = @Z1_Water_Target_Temp - @Z1_Heat_Request_Temp;
 	if #CompRunSec < 180 && #CompState == 1 then
-		#SoftStartControl = ceil(@Main_Outlet_Temp - 4 + ceil(#CompRunSec / 120)) - $WarTemp;
+		#SoftStartControl = ceil(@Main_Outlet_Temp - 4 + ceil(#CompRunSec / 60)) - $WarTemp;
 		$a = 1;$b =', CRS < 180';
 	elseif #CompRunTime < (300 - 5 * #OutsideTemp) then
 		if @Main_Outlet_Temp > #MOT then
@@ -98,7 +99,8 @@ on TaShift2 then
 	end
 	#MOT = @Main_Outlet_Temp;
 	#RoomTempControl = round(#RoomTempDelta * -3);
-	#SHifT = #SoftStartControl + #RoomTempControl;
+	#SHifT = #SoftStartControl;
+	if #CompRunTime > 14 || #RoomTempControl > 0 then #SHifT = #SoftStartControl + #RoomTempControl;end
 
 	if $a > 1 && (@Main_Outlet_Temp - $WarTemp - #SHifT) > 1.8 then
 		#SHifT = ceil(@Main_Outlet_Temp - 1.8) - $WarTemp;
@@ -179,7 +181,7 @@ end
 on pumpDuty then
 	if #allowPumpDuty == 1 && #RemoteOverRide < 5 then
 		#allowPumpDuty = 2;
-		#MaxPumpDuty = 85;
+		#MaxPumpDuty = 82;
 		if @ThreeWay_Valve_State == 1 then
 			#MaxPumpDuty = 140;
 			if (@Sterilization_State == 0 && @DHW_Temp > @DHW_Target_Temp) || (@Sterilization_State == 1 && @DHW_Temp > 57) then
