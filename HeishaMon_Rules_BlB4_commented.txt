@@ -37,7 +37,7 @@ functions NOT running with #Remoteoverride value:
 *Called by*: system Boot
 01]]
 on System#Boot then
-	print('BLB Heishamon_rules20241204j.txt');
+	print('BLB Heishamon_rules20241205.txt');
 	#allowDHW = 1;
 	#allowOTT = 1;
 	#allowTaShift= 1;
@@ -128,9 +128,9 @@ on TaShift2 then															-- part of TaShift but separated due to HeishaMon
 		$a = 1;	$b =	', CRS < 180';
 	elseif #CompRunTime < (300 -  5 * #OutsideTemp) then										-- phase 2, main control period, keep TTo below To to keep Hz low but not too low to switch off
 		if @Main_Outlet_Temp > #MOT then 											-- a hysteresis is build in to avoid TTo jumping up and down too much
-			#SoftStartControl = ceil(@Main_Outlet_Temp - 1.6) - $WarTemp;
-		else
 			#SoftStartControl = ceil(@Main_Outlet_Temp - 1.8) - $WarTemp;
+		else
+			#SoftStartControl = ceil(@Main_Outlet_Temp - 1.5) - $WarTemp;
 		end
 		$a = 2;	$b = concat(', CRT < ', (300 - 5 * #OutsideTemp));
 	elseif #SoftStartControl > 0 then												-- phase 3, returning back to 0 over time if SoftStartControl > 0
