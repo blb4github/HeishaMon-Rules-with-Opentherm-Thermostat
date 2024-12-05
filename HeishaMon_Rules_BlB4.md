@@ -1,6 +1,6 @@
 ```LUA
 on System#Boot then
-	print('BLB Heishamon_rules20241202k.txt');
+	print('BLB Heishamon_rules20241204j.txt');
 	#allowDHW = 1;
 	#allowOTT = 1;
 	#allowTaShift = 1;
@@ -48,7 +48,6 @@ on TaShift then
 	if (#CompRunTime < 15 || #allowTaShift == 2) && #DHWRun < 1 && @ThreeWay_Valve_State == 0 then
 		#SHifT = @Z1_Heat_Request_Temp;
 		if #CompState > 0 then
-			if #Debug > 1 || #RemoteOverRide > 0 then	print('TaShift if Compressor is running');end
 			TaShift2();
 			if #allowHeatDelta == 1 then
 				$HD = -1;
@@ -86,7 +85,7 @@ on TaShift2 then
 		if @Main_Outlet_Temp > #MOT then
 			#SoftStartControl = ceil(@Main_Outlet_Temp - 1.8) - $WarTemp;
 		else
-			#SoftStartControl = ceil(@Main_Outlet_Temp - 1.6) - $WarTemp;
+			#SoftStartControl = ceil(@Main_Outlet_Temp - 1.5) - $WarTemp;
 		end
 		$a = 2;$b = concat(', CRT <', (300 - 5 * #OutsideTemp));
 	elseif #SoftStartControl > 0 then
@@ -109,34 +108,32 @@ on TaShift2 then
 	if #Debug > 0 || #RemoteOverRide > 0 then	print('TaM phase ', $a, $b, ' CRS: ', #CompRunSec, ' CRT: ', #CompRunTime, ' RTD: ', #RoomTempDelta, ' SSC: ', #SoftStartControl, ' RTC: ', #RoomTempControl, ' SHifT: ', #SHifT, ' MOT: ', @Main_Outlet_Temp, ' Z1T: ',  @Z1_Water_Target_Temp);end
 end
 
-on HeatPumpState then
-	if @Heatpump_State != #HPStateR && #RemoteOverRide != -1 then @SetHeatpump = #HPStateR;end
-end
-
 on OperatingMode then
 	if @Operating_Mode_State != #OMR then @SetOperationMode = #OMR;end
 end
 
+on HeatPumpState($a) then
+	$HPSS = $a;print('HPS source: ', $HPSS);
+	if @Heatpump_State != #HPStateR && #RemoteOverRide != -1 then @SetHeatpump = #HPStateR;end
+end
+
 on OpenThermThermostat then
 	if #allowOTT == 1 && #RemoteOverRide < 3 && #DHWRun < 1 && @ThreeWay_Valve_State == 0 && @Defrosting_State == 0 then
-		if #chEnable == 1 && #RoomTempDelta < 0.3 then
+		#allowOTT = 2;
+		if #chEnable == 1 && #RoomTempDelta < 0.3 && #HPStateR != 1 then
 			#HPStateR = 1;
-			HeatPumpState();
-		end
-
-		if (#RoomTempDelta > 0.7 || #chEnableOffTime > 30 || (#chEnableOffTime > 15 && #CompressorRunTime < -15) || (#chEnableOffTime > 5 && %hour > 22)) && #3WayValve == 0 && (#CompressorRunTime > 60 || #CompressorState == 0) && #OutsideTemp > -5 then
+			HeatPumpState('OTTON');
+			#allowOTT = 3;
+		elseif (#RoomTempDelta > 0.7 || #chEnableOffTime > 30 || (#chEnableOffTime > 15 && #CompressorRunTime < -15) || (#chEnableOffTime > 5 && %hour > 22)) && #3WayValve == 0 && (#CompressorRunTime > 60 || #CompressorState == 0) && #OutsideTemp > -5 then
+			#allowOTT = 4;
 			if @ThreeWay_Valve_State == 0 && (#CompRunTime > 90 || #CompState == 0) && #OutsideTemp > -5 && #HPStateR != 0 then
 				#HPStateR = 0;
-				HeatPumpState();
+				HeatPumpState('OTTOFF');
 				if  @Operating_Mode_State != 0 then @SetOperationMode = 0;end
-				#allowOTT = 2;
-				setTimer(7,600);
-			end
-			if #chEnable == 0 && #allowOTT != 2 then
-				#allowOTT = 3;
-				setTimer(7,25);
+				#allowOTT = 5;
 			end
 		end
+		setTimer(7,58);
 	end
 end
 
@@ -156,7 +153,7 @@ on DHW then
 			end
 			OperatingMode();
 			#HPStateR = 1;
-			HeatPumpState();
+			HeatPumpState('DHWON');
 		end
 		if #DHWRun > 0 then
 			if %day > (#SterilizationDay - 2) && %hour > 10 && @DHW_Temp > 47 && @Sterilization_State != 1 then
@@ -168,7 +165,7 @@ on DHW then
 				#OMP = @Operating_Mode_State;
 				OperatingMode();
 				#HPStateR = #HPStateP;
-				HeatPumpState();
+				HeatPumpState('DHWOFF');
 				#HPStateP = 1;
 				#DHWRun = 0;
 			end
@@ -278,7 +275,6 @@ on syncOT then
 		end
 		$RoomSetpoint = min(max(?roomTempSet, 10), 22);
 		#RoomTempDelta = max(min(20 - $RoomSetpoint, 5), -5);
-		print('$RTS: ', $RoomSetpoint, ' #RTD: ', #RoomTempDelta);
 	end
 end
 
