@@ -1,6 +1,6 @@
 ```LUA
 on System#Boot then
-	print('BLB Heishamon_rules20241204j.txt');
+	print('BLB Heishamon_rules20241205.txt');
 	#allowDHW = 1;
 	#allowOTT = 1;
 	#allowTaShift = 1;
@@ -133,8 +133,8 @@ on OpenThermThermostat then
 				#allowOTT = 5;
 			end
 		end
-		setTimer(7,58);
 	end
+	setTimer(7,58);
 end
 
 on DHW then
