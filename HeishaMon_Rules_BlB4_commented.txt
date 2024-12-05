@@ -37,7 +37,7 @@ functions NOT running with #Remoteoverride value:
 *Called by*: system Boot
 01]]
 on System#Boot then
-	print('BLB Heishamon_rules20241202k.txt');
+	print('BLB Heishamon_rules20241204j.txt');
 	#allowDHW = 1;
 	#allowOTT = 1;
 	#allowTaShift= 1;
@@ -91,8 +91,7 @@ on TaShift then
 	if #allowTaShift > 20 then #allowTaShift = 2; end										-- #run TaShift at least every 15 * 20 = 300 seconds (5 minutes)
 	if (#CompRunTime < 15 || #allowTaShift == 2) && #DHWRun < 1 && @ThreeWay_Valve_State == 0 then					-- run TaShift every 15 seconds during compressor start phase (the first 15 minutes) during Heat
 		#SHifT = @Z1_Heat_Request_Temp;
-		if #CompState > 0 then													-- Compressor is running 
-			if #Debug > 1 || #RemoteOverRide > 0 then	print('TaShift if Compressor is running');	end
+		if #CompState > 0 then													-- Compressor is running
 			TaShift2();													-- actions when compressor are running in rule TaShift2() due to error HeishaMon FW.
 			if #allowHeatDelta == 1 then											-- Increase HeatDelta first minutes of the compressor run to lower the compressor frequency asap.
 				$HD = -1;
@@ -121,6 +120,7 @@ on TaShift then
 	end
 end
 
+-- 03
 on TaShift2 then															-- part of TaShift but separated due to HeishaMon firmware error
 	$WarTemp = @Z1_Water_Target_Temp - @Z1_Heat_Request_Temp;									-- define the WAR temp (this temp is in my setup controlled by HP)
 	if #CompRunSec < 180 && #CompState == 1 then											-- phase 1 (compressor run time < 180 seconds and not if rules are recently loaded (#CompState == 2))
@@ -128,9 +128,9 @@ on TaShift2 then															-- part of TaShift but separated due to HeishaMon
 		$a = 1;	$b =	', CRS < 180';
 	elseif #CompRunTime < (300 -  5 * #OutsideTemp) then										-- phase 2, main control period, keep TTo below To to keep Hz low but not too low to switch off
 		if @Main_Outlet_Temp > #MOT then 											-- a hysteresis is build in to avoid TTo jumping up and down too much
-			#SoftStartControl = ceil(@Main_Outlet_Temp - 1.8) - $WarTemp;
-		else
 			#SoftStartControl = ceil(@Main_Outlet_Temp - 1.6) - $WarTemp;
+		else
+			#SoftStartControl = ceil(@Main_Outlet_Temp - 1.8) - $WarTemp;
 		end
 		$a = 2;	$b = concat(', CRT < ', (300 - 5 * #OutsideTemp));
 	elseif #SoftStartControl > 0 then												-- phase 3, returning back to 0 over time if SoftStartControl > 0
@@ -153,18 +153,20 @@ on TaShift2 then															-- part of TaShift but separated due to HeishaMon
 	if #Debug > 0 || #RemoteOverRide > 0 then	print('TaM phase ', $a, $b, ' CRS: ', #CompRunSec, ' CRT: ', #CompRunTime, ' RTD: ', #RoomTempDelta, ' SSC: ', #SoftStartControl, ' RTC: ', #RoomTempControl, ' SHifT: ', #SHifT, ' MOT: ', @Main_Outlet_Temp, ' Z1T: ',  @Z1_Water_Target_Temp);	end
 end
 
+-- 04
+on OperatingMode then
+	if @Operating_Mode_State != #OMR then @SetOperationMode = #OMR; end								-- set only when value changed
+end
+
 --[[
 **HeatPumpState**
 *Purpose*: switch HP on or off
 *Explanation*: sets Heatpump state to #HPStateR, only if #RemoteOverRide is not set (to -1).
 *Called by*: OpenThermThermostat, DHW
-04]]
-on HeatPumpState then
+05]]
+on HeatPumpState($a) then
+	$HPSS = $a; print('HPS source: ', $HPSS);
 	if @Heatpump_State != #HPStateR && #RemoteOverRide != -1 then @SetHeatpump = #HPStateR; end					-- set only when value changed
-end
-
-on OperatingMode then
-	if @Operating_Mode_State != #OMR then @SetOperationMode = #OMR; end								-- set only when value changed
 end
 
 --[[
@@ -178,26 +180,24 @@ By default this function is checked every 30 seconds except when heatpump is swi
 06]]
 on OpenThermThermostat then
 	if #allowOTT == 1 && #RemoteOverRide < 3 && #DHWRun < 1 && @ThreeWay_Valve_State == 0 && @Defrosting_State == 0 then
-		if #chEnable == 1 && #RoomTempDelta < 0.3 then
+		#allowOTT = 2;
+		if #chEnable == 1 && #RoomTempDelta < 0.3 && #HPStateR != 1 then
 			#HPStateR = 1;													-- Set HP ON (HP State 1) if Heat Request
-			HeatPumpState();
-		end
-
-		if (#RoomTempDelta > 0.7 || #chEnableOffTime > 30 || (#chEnableOffTime > 15 && #CompressorRunTime < -15) || (#chEnableOffTime > 5 && %hour > 22)) && #3WayValve == 0 && (#CompressorRunTime > 60 || #CompressorState == 0) && #OutsideTemp > -5 then
+			HeatPumpState('OTTON');
+			#allowOTT = 3;
+		elseif (#RoomTempDelta > 0.7 || #chEnableOffTime > 30 || (#chEnableOffTime > 15 && #CompressorRunTime < -15) || (#chEnableOffTime > 5 && %hour > 22)) && #3WayValve == 0 && (#CompressorRunTime > 60 || #CompressorState == 0) && #OutsideTemp > -5 then
+			#allowOTT = 4;
 			if @ThreeWay_Valve_State == 0 && (#CompRunTime > 90 || #CompState == 0) && #OutsideTemp > -5 && #HPStateR != 0 then
 				#HPStateR = 0;												-- Set HP OFF (HP State 0) if no Heat Request anymore
-				HeatPumpState();
+				HeatPumpState('OTTOFF');
 				if  @Operating_Mode_State != 0 then @SetOperationMode = 0; end
-				#allowOTT = 2;
-				setTimer(7,600);
-			end
-			if #chEnable == 0 && #allowOTT != 2 then
-				#allowOTT = 3;
-				setTimer(7,25);
+				#allowOTT = 5;
 			end
 		end
 	end
+	setTimer(7,58);															-- run every 60 seconds when #chEnable 
 end
+
 
 --[[
 **DHW**
@@ -221,7 +221,7 @@ on DHW then
 			end
 			OperatingMode();												-- change OM
 			#HPStateR = 1;													-- set #HPStateR (Requested HP state) to 1
-			HeatPumpState();												-- change HP state
+			HeatPumpState('DHWON');												-- change HP state
 		end
 		if #DHWRun > 0 then													-- if DHW run is ongoing
 			if %day > (#SterilizationDay - 2) && %hour > 10 && @DHW_Temp > 47 && @Sterilization_State != 1 then
@@ -233,7 +233,7 @@ on DHW then
 				#OMP = @Operating_Mode_State;										-- set #OMP to current OM
 				OperatingMode();											-- return to previous OM after DHW run 
 				#HPStateR = #HPStateP;											-- set #HPStateR to #HPStateP (previous HP State)
-				HeatPumpState();											-- return to previous HPState
+				HeatPumpState('DHWOFF');										-- return to previous HPState
 				#HPStateP = 1;												-- set #HPStateP (previous HS State to 1 (during DHW run)
 				#DHWRun = 0;												-- reset #DHWrun back to 0
 			end
@@ -295,12 +295,12 @@ on pumpDuty then
 	end
 end
 
---[[rule 09
+--[[
 **QuietMode**
 *Purpose*: to define #RQuietMode value based on outside temperature and time of day. 
 *Explanation*: Quiet Mode is used for 2 reasons: 1) to limit the noice from the HP during night time, 2) to limit the startup power (which comes with noice as well) to prevent short runs. During DHW mode in dayTime the QuietMode level will be 1 step reduced to have more power available. This function runs every 2 minutes.
 *Called by*: timer=1
-]]
+09]]
 on QuietMode then
 	if #allowQuietMode == 1 && #RemoteOverRide < 2 && @Defrosting_State == 0 then
 		#allowQuietMode = 2;
@@ -327,13 +327,13 @@ on QuietMode then
 	if #QMR != @Quiet_Mode_Level then @SetQuietMode = #QMR; end
 end
 
---[[rule 10
+--[[
 **syncOT** (synchOpenTherm)
 *Purpose*: 1) synchronizes several ?opentherm values with their corresponding @heatpump values and vice versa, 2) sync #chEnable with ?chEnable, 3) set #chEnableTimeOff variable.
 *Explanation*: Most of the sync is straight forward, ?chEnable is sometime switched off for a short moment, the logic keeps #chEnable 1 as long as ?chEnable is 0 for less than 5 minutes or ?chSetpoint = 10. #chEnableTimeOff is used in OTTThermostat to swich off compressor and/or water pump. ?maxTSet is only cynch with #MaxTa when #MaxTa is set. During Defrost both ?chState & DHWState are set to 0. This function runs every 15 seconds (in same pace as Timer=1)
 *Result*: #chE(nable), #chETimeOff
 *Called by*: timer=1
-]]
+10]]
 on syncOT then
 	if  #allowSyncOT == 1 then
 		?outletTemp = round(@Main_Outlet_Temp);
@@ -365,15 +365,14 @@ on syncOT then
 		end
 		$RoomSetpoint = min(max(?roomTempSet, 10), 22);
 		#RoomTempDelta = max(min(20 - $RoomSetpoint, 5), -5);									-- replace 20 with ?roomTemp if your thermostat is providing a good, stable value.
-		print('$RTS: ', $RoomSetpoint, ' #RTD: ', #RoomTempDelta);
 	end
 end
 
---[[rule 11
+--[[
 **syncHP** (sync Heat Pump variable)
 *Purpose*: 1) synchronizes several @heatpump values to use them in several functions
 *Called by*: timer=1
-]]
+11]]
 on syncHP then
 	if #allowSynchHP == 1 then
 		#allowSynchHP = 2;
@@ -464,7 +463,5 @@ on timer=9 then #allowSynchHP = 1; end
 -- rule 22
 on timer=10 then
 	#CompRunSec = #CompRunSec + 5;
-	if #CompRunSec < 600 then	setTimer(10,5);	end
-end
 	if #CompRunSec < 600 then	setTimer(10,5);	end
 end
