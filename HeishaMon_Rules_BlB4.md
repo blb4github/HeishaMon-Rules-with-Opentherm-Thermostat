@@ -1,13 +1,13 @@
 ```LUA
 on System#Boot then
-	print('BLB Heishamon_rules20241205.txt');
+	print('BLB Heishamon_rules20241205g.txt');
 	#allowDHW = 1;
 	#allowOTT = 1;
 	#allowTaShift = 1;
 	#allowHeatDelta = 1;
 	#allowPumpDuty = 1;
 	#allowQuietMode = 1;
-	#allowSynchHP = 1;
+	#allowSyncHP = 1;
 	#allowSyncOT = 1;
 	
 	#chEnable = -1;
@@ -98,10 +98,12 @@ on TaShift2 then
 	end
 	#MOT = @Main_Outlet_Temp;
 	#RoomTempControl = round(#RoomTempDelta * -3);
+	#RoomTempControl = round(#RoomTempDelta * #RoomTempDelta * -6);
+	if #RoomTempDelta < 0 then #RoomTempControl = #RoomTempControl * -1;end
 	#SHifT = #SoftStartControl;
 	if #CompRunTime > 14 || #RoomTempControl > 0 then #SHifT = #SoftStartControl + #RoomTempControl;end
 
-	if $a > 1 && (@Main_Outlet_Temp - $WarTemp - #SHifT) > 1.8 then
+	if ($a == 2 || $a == 3) && (@Main_Outlet_Temp - $WarTemp - #SHifT) > 1.8 then
 		#SHifT = ceil(@Main_Outlet_Temp - 1.8) - $WarTemp;
 		$a = $a + 10;$b = concat($b,' (limit #SHifT)');
 	end
@@ -112,29 +114,27 @@ on OperatingMode then
 	if @Operating_Mode_State != #OMR then @SetOperationMode = #OMR;end
 end
 
-on HeatPumpState($a) then
-	$HPSS = $a;print('HPS source: ', $HPSS);
+on HeatPumpState then
 	if @Heatpump_State != #HPStateR && #RemoteOverRide != -1 then @SetHeatpump = #HPStateR;end
 end
 
 on OpenThermThermostat then
 	if #allowOTT == 1 && #RemoteOverRide < 3 && #DHWRun < 1 && @ThreeWay_Valve_State == 0 && @Defrosting_State == 0 then
-		#allowOTT = 2;
-		if #chEnable == 1 && #RoomTempDelta < 0.3 && #HPStateR != 1 then
-			#HPStateR = 1;
-			HeatPumpState('OTTON');
+		if #chEnable == 1 && #RoomTempDelta < 0.3 && #RHPState != 1 then
+			#RHPState = 1;
+			HeatPumpState();
+		end
+		if (#RoomTempDelta > 0.7 || #chEnableOffTime > 30 || (#chEnableOffTime > 15 && #CompressorRunTime < -15) || (#chEnableOffTime > 5 && %hour > 22)) && @ThreeWay_Valve_State == 0 && (#CompressorRunTime > 60 || #CompressorState == 0) && #OutsideTemp > -5 then
+			#RHPState = 0;
+			HeatPumpState();
+			if  @Operating_Mode_State != 0 then	@SetOperationMode = 0;end
+			#allowOTT = 2;
+			setTimer(4,600);
+		elseif #chEnable == 0 then
 			#allowOTT = 3;
-		elseif (#RoomTempDelta > 0.7 || #chEnableOffTime > 30 || (#chEnableOffTime > 15 && #CompressorRunTime < -15) || (#chEnableOffTime > 5 && %hour > 22)) && #3WayValve == 0 && (#CompressorRunTime > 60 || #CompressorState == 0) && #OutsideTemp > -5 then
-			#allowOTT = 4;
-			if @ThreeWay_Valve_State == 0 && (#CompRunTime > 90 || #CompState == 0) && #OutsideTemp > -5 && #HPStateR != 0 then
-				#HPStateR = 0;
-				HeatPumpState('OTTOFF');
-				if  @Operating_Mode_State != 0 then @SetOperationMode = 0;end
-				#allowOTT = 5;
-			end
+			setTimer(4,30);
 		end
 	end
-	setTimer(7,58);
 end
 
 on DHW then
@@ -246,6 +246,7 @@ end
 
 on syncOT then
 	if  #allowSyncOT == 1 then
+		#allowSyncOT = 2;
 		?outletTemp = round(@Main_Outlet_Temp);
 		?inletTemp = round(@Main_Inlet_Temp);
 		?outsideTemp = #OutsideTemp;
@@ -268,19 +269,22 @@ on syncOT then
 			?flameState = 1;
 			if @Heat_Power_Consumption > 0 then ?chState = 1;else ?chState = 0;end
 			if @DHW_Power_Consumption > 0 then ?dhwState = 1;else ?dhwState = 0;end
+			if @Cool_Power_Consumption > 0 then ?coolingState = 1;end
 		else
 			?flameState = 0;
 			?chState = 0;
 			?dhwState = 0;
+			?coolingState = 0;
 		end
 		$RoomSetpoint = min(max(?roomTempSet, 10), 22);
 		#RoomTempDelta = max(min(20 - $RoomSetpoint, 5), -5);
+		setTimer(7,30);
 	end
 end
 
 on syncHP then
-	if #allowSynchHP == 1 then
-		#allowSynchHP = 2;
+	if #allowSyncHP == 1 then
+		#allowSyncHP = 2;
 		if @Operating_Mode_State == 0 || @Operating_Mode_State == 4 then
 			#Heat = 1;
 		else
@@ -288,7 +292,7 @@ on syncHP then
 		end
 		if (%minute % 15) == 0 then #OutsideTemp = @Outside_Temp;end
 		#RemoteOverRide = @Z2_Heat_Request_Temp;
-		setTimer(9,30);
+		setTimer(8,30);
 	end
 end
 
@@ -297,7 +301,7 @@ on @Compressor_Freq then
 		#CompStateChangeTime = #Time;
 		#CompState = 1;
 		#CompRunSec = 0;
-		setTimer(10,5);
+		setTimer(9,5);
 	elseif @Compressor_Freq < 18 && #CompState > 0 then
 		#CompStateChangeTime = #Time;
 		#CompState = 0;
@@ -354,13 +358,14 @@ on timer=2 then
 end
 
 on timer=3 then #allowQuietMode = 1;end
+on timer=4 then #allowOTT = 1;end
 on timer=5 then #allowPumpDuty = 1;end
 on timer=6 then #allowDHW = 1;end
-on timer=7 then #allowOTT = 1;end
-on timer=9 then #allowSynchHP = 1;end
+on timer=7 then #allowSyncOT = 1;end
+on timer=8 then #allowSyncHP = 1;end
 
-on timer=10 then
+on timer=9 then
 	#CompRunSec = #CompRunSec + 5;
-	if #CompRunSec < 600 then	setTimer(10,5);end
+	if #CompRunSec < 600 then	setTimer(9,5);end
 end
 ```
