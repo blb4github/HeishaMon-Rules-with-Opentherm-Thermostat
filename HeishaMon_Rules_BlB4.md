@@ -1,6 +1,6 @@
 ```LUA
 on System#Boot then
-	print('BLB Heishamon_rules20241208.txt');
+	print('BLB Heishamon_rules20241208c.txt');
 	#allowDHW = 1;
 	#allowOTT = 1;
 	#allowTaShift = 1;
@@ -97,11 +97,10 @@ on TaShift2 then
 		$a = 4;$b =', TaShift Finished';
 	end
 	#MOT = @Main_Outlet_Temp;
-	#RoomTempControl = round(#RoomTempDelta * -3);
 	#RoomTempControl = round(#RoomTempDelta * #RoomTempDelta * -6);
 	if #RoomTempDelta < 0 then #RoomTempControl = #RoomTempControl * -1;end
 	#SHifT = #SoftStartControl;
-	if #CompRunTime > 14 || #RoomTempControl > 0 then #SHifT = #SoftStartControl + #RoomTempControl;end
+	if #CompRunTime > 20 || #RoomTempControl > 0 then #SHifT = #SoftStartControl + #RoomTempControl;end
 
 	if ($a == 2 || $a == 3) && (@Main_Outlet_Temp - $WarTemp - #SHifT) > 1.8 then
 		#SHifT = ceil(@Main_Outlet_Temp - 1.8) - $WarTemp;
@@ -121,12 +120,24 @@ end
 on OpenThermThermostat then
 	if #allowOTT == 1 && #RemoteOverRide < 3 && #DHWRun < 1 && @ThreeWay_Valve_State == 0 && @Defrosting_State == 0 then
 		if #chEnable == 1 && #RoomTempDelta < 0.3 && #HPStateR != 1 then
+			if #Debug > 0 then print('OTTx chE: ', #chEnable, ' RTD: ', #RoomTempDelta, 'HPSR: ', #HPStateR);end
 			#HPStateR = 1;
-			HeatPumpState();
+			HeatPumpState('OTTON');
 		end
-		if (#RoomTempDelta > 0.7 || #chEnableOffTime > 30 || (#chEnableOffTime > 15 && #CompressorRunTime < -15) || (#chEnableOffTime > 5 && %hour > 22)) && @ThreeWay_Valve_State == 0 && (#CompressorRunTime > 60 || #CompressorState == 0) && #OutsideTemp > -5 then
+		$OTT = 0;
+		if #RoomTempDelta > 0.7 then
+			$OTT = 1;
+		elseif #chEnableOffTime > 30 then
+			$OTT = 2;
+		elseif #chEnableOffTime > 15 && #CompRunTime < -15 then
+			$OTT = 3;
+		elseif #chEnableOffTime > 5 && %hour > 22 then
+			$OTT = 4;
+		end
+		if $OTT > 0 && @ThreeWay_Valve_State == 0 && (#CompRunTime > 60 || #CompState == 0) && #OutsideTemp > -5 then
+			if #Debug > 0 then print('OTTx: ', $OTT, ' RTD: ', #RoomTempDelta, ' chEOT: ', #chEnableOffTime, ' CRT: ', #CompRunTime, ' h: ', %hour, ' TWV: ', @ThreeWay_Valve_State, ' CS: ', #CompState, #OutsideTemp);end
 			#HPStateR = 0;
-			HeatPumpState();
+			HeatPumpState('OTTOFF');
 			if  @Operating_Mode_State != 0 then	@SetOperationMode = 0;end
 			#allowOTT = 2;
 			setTimer(4,600);
@@ -134,6 +145,8 @@ on OpenThermThermostat then
 			#allowOTT = 3;
 			setTimer(4,30);
 		end
+		if #allowOTT > 1 then #allowOTT = 4;end
+		setTimer(4,60);
 	end
 end
 
@@ -269,12 +282,10 @@ on syncOT then
 			?flameState = 1;
 			if @Heat_Power_Consumption > 0 then ?chState = 1;else ?chState = 0;end
 			if @DHW_Power_Consumption > 0 then ?dhwState = 1;else ?dhwState = 0;end
-			if @Cool_Power_Consumption > 0 then ?coolingState = 1;end
 		else
 			?flameState = 0;
 			?chState = 0;
 			?dhwState = 0;
-			?coolingState = 0;
 		end
 		$RoomSetpoint = min(max(?roomTempSet, 10), 22);
 		#RoomTempDelta = max(min(20 - $RoomSetpoint, 5), -5);
