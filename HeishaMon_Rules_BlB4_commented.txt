@@ -37,7 +37,7 @@ functions NOT running with #Remoteoverride value:
 *Called by*: system Boot
 01]]
 on System#Boot then
-	print('BLB Heishamon_rules20241205g.txt');
+	print('BLB Heishamon_rules20241208.txt');
 	#allowDHW = 1;
 	#allowOTT = 1;
 	#allowTaShift= 1;
@@ -181,12 +181,12 @@ By default this function is checked every 30 seconds except when heatpump is swi
 06]]
 on OpenThermThermostat then
 	if #allowOTT == 1 && #RemoteOverRide < 3 && #DHWRun < 1 && @ThreeWay_Valve_State == 0 && @Defrosting_State == 0 then
-		if #chEnable == 1 && #RoomTempDelta < 0.3 && #RHPState != 1 then
-			#RHPState = 1;													-- Set HP ON (HP State 1) if Heat Request
+		if #chEnable == 1 && #RoomTempDelta < 0.3 && #HPStateR != 1 then
+			#HPStateR = 1;													-- Set HP ON (HP State 1) if Heat Request
 			HeatPumpState();
 		end
 		if (#RoomTempDelta > 0.7 || #chEnableOffTime > 30 || (#chEnableOffTime > 15 && #CompressorRunTime < -15) || (#chEnableOffTime > 5 && %hour > 22)) && @ThreeWay_Valve_State == 0 && (#CompressorRunTime > 60 || #CompressorState == 0) && #OutsideTemp > -5 then
-			#RHPState = 0;													-- Set HP OFF (HP State 0) if no Heat Request anymore
+			#HPStateR = 0;													-- Set HP OFF (HP State 0) if no Heat Request anymore
 			HeatPumpState();
 			if  @Operating_Mode_State != 0 then	@SetOperationMode = 0;	end
 			#allowOTT = 2;
@@ -321,9 +321,9 @@ on QuietMode then
 		end
 		if #QMR > 1 && @ThreeWay_Valve_State == 1 && %hour > 9 && %hour < 17 then #QMR = -1 + #QMR; end
 		setTimer(3,120);													-- run this rule every 2 minutes.
+		if (@Defrosting_State == 1 && #allowQuietMode > 0 || #CompState < 1 || #CompRunTime < 5) || %hour < 7 then #QMR = 3; end
+		if #QMR != @Quiet_Mode_Level then @SetQuietMode = #QMR; end
 	end
-	if (@Defrosting_State == 1 && #allowQuietMode > 0 || #CompState < 1 || #CompRunTime < 5) || %hour < 7 then #QMR = 3; end
-	if #QMR != @Quiet_Mode_Level then @SetQuietMode = #QMR; end
 end
 
 --[[
