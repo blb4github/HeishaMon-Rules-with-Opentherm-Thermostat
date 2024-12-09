@@ -1,6 +1,6 @@
 ```LUA
 on System#Boot then
-	print('BLB Heishamon_rules20241208c.txt');
+	print('BLB Heishamon_rules20241209b.txt');
 	#allowDHW = 1;
 	#allowOTT = 1;
 	#allowTaShift = 1;
@@ -22,7 +22,6 @@ on System#Boot then
 	#DHWRun = -1;
 	#FirstBoot = 1;
 	#Heat = -1;
-	#HeatDelta = 5;
 	#HPStateP = -1;
 	#HPStateR = -1;
 	#MaxPumpDuty = -1;
@@ -49,15 +48,7 @@ on TaShift then
 		#SHifT = @Z1_Heat_Request_Temp;
 		if #CompState > 0 then
 			TaShift2();
-			if #allowHeatDelta == 1 then
-				$HD = -1;
-				if #CompRunTime > -1 && #CompRunTime < 3 then
-					$HD = #HeatDelta + 5;
-				elseif #CompRunTime > 20 && #CompRunTime < 25 then
-					$HD = #HeatDelta;
-				end
-				if @Heat_Delta != $HD && $HD > 0 then @SetFloorHeatDelta = $HD;end
-			end
+
 		else
 			$StopTime = -2 * #OutsideTemp - 30;
 			if  #CompState == 0 && #CompRunTime > $StopTime && #CompRunTime < 2 then
@@ -122,7 +113,7 @@ on OpenThermThermostat then
 		if #chEnable == 1 && #RoomTempDelta < 0.3 && #HPStateR != 1 then
 			if #Debug > 0 then print('OTTx chE: ', #chEnable, ' RTD: ', #RoomTempDelta, 'HPSR: ', #HPStateR);end
 			#HPStateR = 1;
-			HeatPumpState('OTTON');
+			HeatPumpState();
 		end
 		$OTT = 0;
 		if #RoomTempDelta > 0.7 then
@@ -137,7 +128,7 @@ on OpenThermThermostat then
 		if $OTT > 0 && @ThreeWay_Valve_State == 0 && (#CompRunTime > 60 || #CompState == 0) && #OutsideTemp > -5 then
 			if #Debug > 0 then print('OTTx: ', $OTT, ' RTD: ', #RoomTempDelta, ' chEOT: ', #chEnableOffTime, ' CRT: ', #CompRunTime, ' h: ', %hour, ' TWV: ', @ThreeWay_Valve_State, ' CS: ', #CompState, #OutsideTemp);end
 			#HPStateR = 0;
-			HeatPumpState('OTTOFF');
+			HeatPumpState();
 			if  @Operating_Mode_State != 0 then	@SetOperationMode = 0;end
 			#allowOTT = 2;
 			setTimer(4,600);
@@ -145,7 +136,7 @@ on OpenThermThermostat then
 			#allowOTT = 3;
 			setTimer(4,30);
 		end
-		if #allowOTT > 1 then #allowOTT = 4;end
+		if #allowOTT < 2 then #allowOTT = 4;end
 		setTimer(4,60);
 	end
 end
@@ -166,7 +157,7 @@ on DHW then
 			end
 			OperatingMode();
 			#HPStateR = 1;
-			HeatPumpState('DHWON');
+			HeatPumpState();
 		end
 		if #DHWRun > 0 then
 			if %day > (#SterilizationDay - 2) && %hour > 10 && @DHW_Temp > 47 && @Sterilization_State != 1 then
@@ -178,7 +169,7 @@ on DHW then
 				#OMP = @Operating_Mode_State;
 				OperatingMode();
 				#HPStateR = #HPStateP;
-				HeatPumpState('DHWOFF');
+				HeatPumpState();
 				#HPStateP = 1;
 				#DHWRun = 0;
 			end
@@ -282,10 +273,12 @@ on syncOT then
 			?flameState = 1;
 			if @Heat_Power_Consumption > 0 then ?chState = 1;else ?chState = 0;end
 			if @DHW_Power_Consumption > 0 then ?dhwState = 1;else ?dhwState = 0;end
+			if @Cool_Power_Consumption > 0 then ?coolingState = 1;else ?coolingState = 0;end
 		else
 			?flameState = 0;
 			?chState = 0;
 			?dhwState = 0;
+			?coolingState = 0;
 		end
 		$RoomSetpoint = min(max(?roomTempSet, 10), 22);
 		#RoomTempDelta = max(min(20 - $RoomSetpoint, 5), -5);
