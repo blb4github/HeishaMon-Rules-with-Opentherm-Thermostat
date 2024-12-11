@@ -1,6 +1,6 @@
 ```LUA
 on System#Boot then
-	print('BLB Heishamon_rules20241209b.txt');
+	print('BLB Heishamon_rules20241209c.txt');
 	#allowDHW = 1;
 	#allowOTT = 1;
 	#allowTaShift = 1;
@@ -110,33 +110,29 @@ end
 
 on OpenThermThermostat then
 	if #allowOTT == 1 && #RemoteOverRide < 3 && #DHWRun < 1 && @ThreeWay_Valve_State == 0 && @Defrosting_State == 0 then
+		#allowOTT = 2;
 		if #chEnable == 1 && #RoomTempDelta < 0.3 && #HPStateR != 1 then
 			if #Debug > 0 then print('OTTx chE: ', #chEnable, ' RTD: ', #RoomTempDelta, 'HPSR: ', #HPStateR);end
 			#HPStateR = 1;
 			HeatPumpState();
+		else
+			$OTT = 0;
+			if #RoomTempDelta > 0.7 then
+				$OTT = 1;
+			elseif #chEnableOffTime > 30 then
+				$OTT = 2;
+			elseif #chEnableOffTime > 15 && #CompRunTime < -15 then
+				$OTT = 3;
+			elseif #chEnableOffTime > 5 && %hour > 22 then
+				$OTT = 4;
+			end
+			if $OTT > 0 && @ThreeWay_Valve_State == 0 && (#CompRunTime > 60 || #CompState == 0) && #OutsideTemp > -5 && #HPStateR != 0 then
+				if #Debug > 0 then print('OTTx: ', $OTT, ' RTD: ', #RoomTempDelta, ' chEOT: ', #chEnableOffTime, ' CRT: ', #CompRunTime, ' h: ', %hour, ' TWV: ', @ThreeWay_Valve_State, ' CS: ', #CompState, #OutsideTemp);end
+				#HPStateR = 0;
+				HeatPumpState();
+				if  @Operating_Mode_State != 0 then	@SetOperationMode = 0;end
+			end
 		end
-		$OTT = 0;
-		if #RoomTempDelta > 0.7 then
-			$OTT = 1;
-		elseif #chEnableOffTime > 30 then
-			$OTT = 2;
-		elseif #chEnableOffTime > 15 && #CompRunTime < -15 then
-			$OTT = 3;
-		elseif #chEnableOffTime > 5 && %hour > 22 then
-			$OTT = 4;
-		end
-		if $OTT > 0 && @ThreeWay_Valve_State == 0 && (#CompRunTime > 60 || #CompState == 0) && #OutsideTemp > -5 then
-			if #Debug > 0 then print('OTTx: ', $OTT, ' RTD: ', #RoomTempDelta, ' chEOT: ', #chEnableOffTime, ' CRT: ', #CompRunTime, ' h: ', %hour, ' TWV: ', @ThreeWay_Valve_State, ' CS: ', #CompState, #OutsideTemp);end
-			#HPStateR = 0;
-			HeatPumpState();
-			if  @Operating_Mode_State != 0 then	@SetOperationMode = 0;end
-			#allowOTT = 2;
-			setTimer(4,600);
-		elseif #chEnable == 0 then
-			#allowOTT = 3;
-			setTimer(4,30);
-		end
-		if #allowOTT < 2 then #allowOTT = 4;end
 		setTimer(4,60);
 	end
 end
