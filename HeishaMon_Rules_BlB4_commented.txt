@@ -35,9 +35,9 @@ functions NOT running with #Remoteoverride value:
 
 *Explanation*: By default all functions are enabled (the #allow... variables), you can disable them by setting to 0. 1 Variable has to be set according needs, e.g. Debug can be set to 0 (no debug) or to 1 (basis debug), #LegionallaRunDay can be set 1 to 7. Except #FirstBoot all other global variables are default set to -1 so you can monitor the results of the functions easily. In the System#Boot loop timer 1 is triggered after 60 seconds to give time to fill all variables from HP, OT and 1W.
 *Called by*: system Boot
-01]]
+rule 01]]
 on System#Boot then
-	print('BLB Heishamon_rules20241209b.txt');
+	print('BLB Heishamon_rules20241211.txt');
 	#allowDHW = 1;
 	#allowOTT = 1;
 	#allowTaShift= 1;
@@ -59,7 +59,7 @@ on System#Boot then
 	#DHWRun = -1;						-- DHWrun state (0/1)
 	#FirstBoot = 1;						-- 1 initiates boot up routine
 	#Heat = -1;						-- HP in OM which includes Heat
---	#HeatDelta = 5;						-- HeatDelta (To - Tr temp difference)
+--	#HeatDelta = 5;						-- HeatDelta (To - Tr temp difference) 20241209 not implemented yet
 	#HPStateP = -1;						-- Previous Heat Pump state
 	#HPStateR = -1;						-- Required Heat Pump state
 	#MaxPumpDuty = -1;					-- Maximum Pumpduty value which fits my installation (~ 11l/m)
@@ -85,7 +85,7 @@ end
 *Explanation*: at a certain (high) outside Temperature the minimum power of the HP is higher than the heat lost and as a result the compressor will switch off if To > TTo + 2 degrees. This can lead to short compressor run times and the purpose of this function is to extend the runtime by shifting the Target Temp up. The maximum shift is based on outside temperature and below a certain outside temperature (<=6 degrees) the shift will not be set (as not required).
 *Result*: @SetZ1HeatRequestTemperature set to required value
 *Called by*: timer=1
-02]]
+rule 02]]
 on TaShift then
 	if #allowTaShift > 0 then #allowTaShift = #allowTaShift + 1;	end								-- #allowTaShift is set to 0 by change of @Main_Outlet_Temp and @Z1_Water_Target_Temp
 	if #allowTaShift > 20 then #allowTaShift = 2; end										-- #run TaShift at least every 15 * 20 = 300 seconds (5 minutes)
@@ -94,7 +94,7 @@ on TaShift then
 		if #CompState > 0 then													-- Compressor is running
 			TaShift2();													-- actions when compressor are running in rule TaShift2() due to error HeishaMon FW.
 --[[
-			if #allowHeatDelta == 1 then											-- Increase HeatDelta first minutes of the compressor run to lower the compressor frequency asap.
+			if #allowHeatDelta == 1 then											-- 20241209 not implemented yet! Increase HeatDelta first minutes compressorrun to lower the compfreq asap.
 				$HD = -1;
 				if #CompRunTime > -1 && #CompRunTime < 3 then
 					$HD = #HeatDelta + 5;										-- increase default HeatDelta with 5
@@ -122,7 +122,7 @@ on TaShift then
 	end
 end
 
--- 03
+-- rule 03
 on TaShift2 then															-- part of TaShift but separated due to HeishaMon firmware error
 	$WarTemp = @Z1_Water_Target_Temp - @Z1_Heat_Request_Temp;									-- define the WAR temp (this temp is in my setup controlled by HP)
 	if #CompRunSec < 180 && #CompState == 1 then											-- phase 1 (compressor run time < 180 seconds and not if rules are recently loaded (#CompState == 2))
@@ -156,7 +156,12 @@ on TaShift2 then															-- part of TaShift but separated due to HeishaMon
 	if #Debug > 0 || #RemoteOverRide > 0 then	print('TaM phase ', $a, $b, ' CRS: ', #CompRunSec, ' CRT: ', #CompRunTime, ' RTD: ', #RoomTempDelta, ' SSC: ', #SoftStartControl, ' RTC: ', #RoomTempControl, ' SHifT: ', #SHifT, ' MOT: ', @Main_Outlet_Temp, ' Z1T: ',  @Z1_Water_Target_Temp);	end
 end
 
--- 04
+--[[
+**OperatingMode**
+*Purpose*: change Operating Mode (between Heat and Heat + DHW)
+*Explanation*: sets OperatingMode to #OMRR
+*Called by*: DHW
+rule 04]]
 on OperatingMode then
 	if @Operating_Mode_State != #OMR then @SetOperationMode = #OMR; end								-- set only when value changed
 end
@@ -166,9 +171,9 @@ end
 *Purpose*: switch HP on or off
 *Explanation*: sets Heatpump state to #HPStateR, only if #RemoteOverRide is not set (to -1).
 *Called by*: OpenThermThermostat, DHW
-05]]
+rule 05]]
 on HeatPumpState then
-	if @Heatpump_State != #HPStateR && #RemoteOverRide != -1 then @SetHeatpump = #HPStateR; end					-- set only when value changed
+	if @Heatpump_State != #HPStateR && #RemoteOverRide != -1 then @SetHeatpump = #HPStateR; end					-- set only when value changed and #RemoteOverRide != 0
 end
 
 --[[
@@ -182,34 +187,30 @@ By default this function is checked every 30 seconds except when heatpump is swi
 06]]
 on OpenThermThermostat then
 	if #allowOTT == 1 && #RemoteOverRide < 3 && #DHWRun < 1 && @ThreeWay_Valve_State == 0 && @Defrosting_State == 0 then
-		if #chEnable == 1 && #RoomTempDelta < 0.3 && #HPStateR != 1 then
+		#allowOTT = 2;
+		if #chEnable == 1 && #RoomTempDelta < 0.3 && #HPStateR != 1 then							-- Heat request is when chEnable == 1 and #RoomTempDelta < 0.3
 			if #Debug > 0 then print('OTTx chE: ', #chEnable, ' RTD: ', #RoomTempDelta, 'HPSR: ', #HPStateR);end
 			#HPStateR = 1;													-- Set HP ON (HP State 1) if Heat Request
 			HeatPumpState();
+		else
+			$OTT = 0;													-- for debugging reasons this if/elseif is setup. Switch off is allowed when:
+			if #RoomTempDelta > 0.7 then											-- #RoomTempDelta is high (> 0.7)
+				$OTT = 1;
+			elseif #chEnableOffTime > 30 then										-- #ChEnable is off for more than 30 minutes
+				$OTT = 2;
+			elseif #chEnableOffTime > 15 && #CompRunTime < -15 then								-- #ChEnable is off for more than 15 minutes and compressor is off for more than 15 minutes
+				$OTT = 3;
+			elseif #chEnableOffTime > 5 && %hour > 22 then									-- #ChEnable is off for more than 5 minutes and time is after 23h
+				$OTT = 4;
+			end
+			if $OTT > 0 && @ThreeWay_Valve_State == 0 && (#CompRunTime > 60 || #CompState == 0) && #OutsideTemp > -5 && #HPStateR != 0 then		-- additional conditions to really switch off Heat Pump.
+				if #Debug > 0 then print('OTTx: ', $OTT, ' RTD: ', #RoomTempDelta, ' chEOT: ', #chEnableOffTime, ' CRT: ', #CompRunTime, ' h: ', %hour, ' TWV: ', @ThreeWay_Valve_State, ' CS: ', #CompState, #OutsideTemp);end
+				#HPStateR = 0;												-- Set HP OFF (HP State 0) if no Heat Request anymore
+				HeatPumpState();
+				if  @Operating_Mode_State != 0 then	@SetOperationMode = 0;end					-- if, for whatever reason OM != 0 then OM = 0
+			end
 		end
-		$OTT = 0;
-		if #RoomTempDelta > 0.7 then
-			$OTT = 1;
-		elseif #chEnableOffTime > 30 then
-			$OTT = 2;
-		elseif #chEnableOffTime > 15 && #CompRunTime < -15 then
-			$OTT = 3;
-		elseif #chEnableOffTime > 5 && %hour > 22 then
-			$OTT = 4;
-		end
-		if $OTT > 0 && @ThreeWay_Valve_State == 0 && (#CompRunTime > 60 || #CompState == 0) && #OutsideTemp > -5 then
-			if #Debug > 0 then print('OTTx: ', $OTT, ' RTD: ', #RoomTempDelta, ' chEOT: ', #chEnableOffTime, ' CRT: ', #CompRunTime, ' h: ', %hour, ' TWV: ', @ThreeWay_Valve_State, ' CS: ', #CompState, #OutsideTemp);end
-			#HPStateR = 0;													-- Set HP OFF (HP State 0) if no Heat Request anymore
-			HeatPumpState();
-			if  @Operating_Mode_State != 0 then	@SetOperationMode = 0;end
-			#allowOTT = 2;
-			setTimer(4,600);
-		elseif #chEnable == 0 then
-			#allowOTT = 3;
-			setTimer(4,30);
-		end
-		if #allowOTT < 2 then #allowOTT = 4;end
-		setTimer(4,60);
+		setTimer(4,60);														-- run every minute (but only when #heat = 1, see syncHP
 	end
 end
 
@@ -218,7 +219,7 @@ end
 *Purpose*: 1) to have hot water available & 2) to do weekly sterilization run.
 *Explanation*: DHW run will be done: 1) every day after 13h (most efficient time of the day) if DHW temp is below default threshold (@DHW_Heat_Delta), 2) after 9h if DHW temp is 5 degrees below default threshold and 3) immediately if DHW Temp is 10 degrees below default threshold. If day is #SterilizationDay a DHW run + sterilization run will always be performed, also if default threshold is not passed. If a DHW run is performed after 11h on the day before #SterilizationDay the sterilization run will be perfored on this day and the Sterilization run will be skiped on SterilizationDay itself. OM 4 is used to give the HP the option to produce heat during Sterilization run on external element. After the DHW run the previous OM and HPState will be restored. Defrost state is checked to prevent returning back from DHW run to previous OM if Defrost is performed during DHW run. This function runs every 15 minutes.
 *Called by*: timer=1
-07]]
+rule 07]]
 on DHW then
 	if #allowDHW == 1 && #RemoteOverRide < 4 then
 		#allowDHW = 2;
@@ -265,7 +266,7 @@ During Heat maxPumpDuty will be set in such way the water flow will 10 to 14 lit
 During Idle maxPumpDuty will be set in such way the water flow will be 8 liter per minute.
 When HP switches off maxPumpDuty will be set back to default value.
 *Called by*: timer=1
-08]]
+rule 08]]
 on pumpDuty then
 	if #allowPumpDuty == 1 && #RemoteOverRide < 5 then
 		#allowPumpDuty = 2;
@@ -314,7 +315,7 @@ end
 *Purpose*: to define #RQuietMode value based on outside temperature and time of day. 
 *Explanation*: Quiet Mode is used for 2 reasons: 1) to limit the noice from the HP during night time, 2) to limit the startup power (which comes with noice as well) to prevent short runs. During DHW mode in dayTime the QuietMode level will be 1 step reduced to have more power available. This function runs every 2 minutes.
 *Called by*: timer=1
-09]]
+rule 09]]
 on QuietMode then
 	if #allowQuietMode == 1 && #RemoteOverRide < 2 && @Defrosting_State == 0 then
 		#allowQuietMode = 2;
@@ -335,9 +336,9 @@ on QuietMode then
 			#QMR = 3;
 		end
 		if #QMR > 1 && @ThreeWay_Valve_State == 1 && %hour > 9 && %hour < 17 then #QMR = -1 + #QMR; end
-		setTimer(3,120);													-- run this rule every 2 minutes.
-		if (@Defrosting_State == 1 && #allowQuietMode > 0 || #CompState < 1 || #CompRunTime < 5) || %hour < 7 then #QMR = 3; end
-		if #QMR != @Quiet_Mode_Level then @SetQuietMode = #QMR; end
+		setTimer(3,120);															-- run this rule every 2 minutes.
+		if @Defrosting_State == 1 || #CompState < 1 || #CompRunTime < 5 || %hour < 7 then #QMR = 3; end						-- always QM3 during all these conditions 
+		if #QMR != @Quiet_Mode_Level then @SetQuietMode = #QMR; end										-- set only when value changed
 	end
 end
 
@@ -347,7 +348,7 @@ end
 *Explanation*: Most of the sync is straight forward, ?chEnable is sometime switched off for a short moment, the logic keeps #chEnable 1 as long as ?chEnable is 0 for less than 5 minutes or ?chSetpoint = 10. #chEnableTimeOff is used in OTTThermostat to swich off compressor and/or water pump. ?maxTSet is only cynch with #MaxTa when #MaxTa is set. During Defrost both ?chState & DHWState are set to 0. This function runs every 15 seconds (in same pace as Timer=1)
 *Result*: #chE(nable), #chETimeOff
 *Called by*: timer=1
-10]]
+rule 10]]
 on syncOT then
 	if  #allowSyncOT == 1 then
 		#allowSyncOT = 2;
@@ -390,7 +391,7 @@ end
 **syncHP** (sync Heat Pump variable)
 *Purpose*: 1) synchronizes several @heatpump values to use them in several functions
 *Called by*: timer=1
-11]]
+rule 11]]
 on syncHP then
 	if #allowSyncHP == 1 then
 		#allowSyncHP = 2;
@@ -405,7 +406,8 @@ on syncHP then
 	end
 end
 
--- rule 12
+--[[
+rule 12]]
 on @Compressor_Freq then
 	if @Compressor_Freq > 18 && #CompState == 0 then
 		#CompStateChangeTime = #Time;
@@ -418,17 +420,20 @@ on @Compressor_Freq then
 	end
 end
 
--- rule 13
+--[[
+rule 13]]
 on @Main_Outlet_Temp then
 	if #allowTaShift > 0 then #allowTaShift = 1; end
 end
 
--- rule 14
+--[[
+rule 14]]
 on @Z1_Water_Target_Temp then
 	if #allowTaShift > 0 then #allowTaShift = 1; end
 end
 
--- rule 15
+--[[
+rule 15]]
 on timer=1 then
 	setTimer(1,15);
 	if #FirstBoot == 1 then
@@ -457,7 +462,8 @@ on timer=1 then
 	end
 end
 
--- rule 16
+--[[
+rule 16]]
 on timer=2 then
 	#Time = %day * 1440 + %hour * 60 + %minute;
 	if @Compressor_Freq > 18 then
@@ -471,7 +477,8 @@ on timer=2 then
 	setTimer(2,60);
 end
 
--- rule 17 till 21
+--[[
+rule 17 till 22]]
 on timer=3 then #allowQuietMode = 1; end
 on timer=4 then #allowOTT = 1; end
 on timer=5 then #allowPumpDuty = 1; end
@@ -479,7 +486,8 @@ on timer=6 then #allowDHW = 1; end
 on timer=7 then #allowSyncOT = 1; end
 on timer=8 then #allowSyncHP = 1; end
 
--- rule 22
+--[[
+rule 23]]
 on timer=9 then
 	#CompRunSec = #CompRunSec + 5;
 	if #CompRunSec < 600 then	setTimer(9,5);	end
