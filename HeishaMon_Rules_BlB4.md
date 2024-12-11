@@ -1,6 +1,6 @@
 ```LUA
 on System#Boot then
-	print('BLB Heishamon_rules20241209c.txt');
+	print('BLB Heishamon_rules20241211.txt');
 	#allowDHW = 1;
 	#allowOTT = 1;
 	#allowTaShift = 1;
@@ -239,7 +239,7 @@ on QuietMode then
 		end
 		if #QMR > 1 && @ThreeWay_Valve_State == 1 && %hour > 9 && %hour < 17 then #QMR = -1 + #QMR;end
 		setTimer(3,120);
-		if (@Defrosting_State == 1 && #allowQuietMode > 0 || #CompState < 1 || #CompRunTime < 5) || %hour < 7 then #QMR = 3;end
+		if @Defrosting_State == 1 || #CompState < 1 || #CompRunTime < 5 || %hour < 7 then #QMR = 3;end
 		if #QMR != @Quiet_Mode_Level then @SetQuietMode = #QMR;end
 	end
 end
