@@ -1,12 +1,12 @@
 ```LUA
 on System#Boot then
-	print('BLB Heishamon_rules_2511.15.lua');
-	#chEnableOnTime = -1;
+	print('BLB Heishamon_rules_2512.02.lua');
+	#chEnableOnMin = -1;
 	#chEnableChangeTime = -1;
 	#chEnableTimeOff = -1;
 	#CompFreqTarget = -1;
 	#CompRunSec = -1;
-	#CompRunTime = -1;
+	#CompRunMin = -1;
 	#CoolingEnable = -1;
 	#DHWComfortDay = 4;
 	#dhwEnable = -1;
@@ -19,8 +19,6 @@ on System#Boot then
 	#PIDintegral	 = 0;
 	#RoomTempDelta = 0;
 	#RoomTempControl = 0;
-	#SHifT = 0;
-	#Time = -1;
 	setTimer(1,10);
 	setTimer(2,30);
 	setTimer(3,35);
@@ -38,28 +36,29 @@ on @Compressor_Freq then
 		#CompStateChangeTime = #Time;
 		#CompState = 1;
 		#CompRunSec = 0;
-		#CompRunTime = 0;
+		#CompRunMin = 0;
 		setTimer(11,5);
 	elseif @Compressor_Freq < 10 && #CompState > 0 then
 		#CompStateChangeTime = #Time;
 		#CompState = 0;
-		#CompRunTime = 0;
+		#CompRunMin = 0;
 		#TaDeltaTimer = 0;
 	end
 end
 
 on timer=1 then
-	setTimer(3,60);
+	setTimer(1,60);
 	#Time = %day * 1440 + %hour * 60 + %minute;
 	if @Compressor_Freq > 10 then
-		#CompRunTime = #Time - #CompStateChangeTime;
+		#CompRunMin = #Time - #CompStateChangeTime;
 	else
-		#CompRunTime = #CompStateChangeTime - #Time;
+		#CompRunMin = #CompStateChangeTime - #Time;
 	end
 end
 
 on timer=2 then
 	#CompStateChangeTime	 = #Time;
+	#chEnableChangeTime	 = #Time;
 	#HPStateR = @Heatpump_State;
 	#HPStateP = @Heatpump_State;
 	#OMR 	 = @Operating_Mode_State;
@@ -75,7 +74,7 @@ on timer=2 then
 		#CompState = 0;
 	end
 	if @ThreeWay_Valve_State then
-		#DHWRun = 2;
+		#DHWRun = 3;
 	end
 	#chEnable = ?chEnable;
 end
@@ -93,8 +92,9 @@ end
 on timer=3 then
 	setTimer(3,15);
 	$NoDefrost = @Defrosting_State == 0 || (@Pump_Flow > 5 && @Pump_Flow < 30);
-	if #Heat && @ThreeWay_Valve_State == 0 && $NoDefrost && #DHWRun < 1 then
-		#SHifT = @Z1_Heat_Request_Temp - #WCS;
+	if #Heat && @ThreeWay_Valve_State == 0 && $NoDefrost && #DHWRun < 2 then
+		$WCS = #WCS + min(max(@Z2_Heat_Request_Temp - 30,0), 5);
+		#SHifT = @Z1_Heat_Request_Temp - $WCS;
 		if #CompState > 0 then
 			if #OutsideTemp < 8 then
 				if #RoomTempDelta > 2 || %hour < 3 then
@@ -115,25 +115,25 @@ on timer=3 then
 					#TaDeltaTimer = #TaDeltaTimer + 1;
 				end
 				if $TaDelta >= 3 then
-					#SHifT = ceil(@Main_Outlet_Temp) - 2 - #WCS;
+					#SHifT = ceil(@Main_Outlet_Temp) - 2 - $WCS;
 				elseif #TaDeltaTimer < 5 then
 					#TaDeltaTimer = #TaDeltaTimer;
-				elseif (@Main_Outlet_Temp - 1.8) > (#RoomTempControl + #WCS) && (#CompRunTime < 30 || #RoomTempDelta < 0 || #chEnable == 1) then
-					#SHifT = ceil(@Main_Outlet_Temp - 1.8 - #WCS);
+				elseif (@Main_Outlet_Temp - 1.8) > (#RoomTempControl + $WCS) && (#CompRunMin < 30 || #RoomTempDelta < 0 || #chEnable == 1) then
+					#SHifT = ceil(@Main_Outlet_Temp - 1.8 - $WCS);
 				else
 					#SHifT = #RoomTempControl;
 				end
 			end
 		else
-			$StopConditions = #CompRunTime > (-2 * #OutsideTemp - 30) || %hour < 7 || %hour > 22 || #RoomTempDelta < 0.2;
-			if #CompState == 0 && $StopConditions && #CompRunTime < 2 then
+			$StopConditions = #CompRunMin > (-2 * #OutsideTemp - 30) || %hour < 7 || %hour > 22 || #RoomTempDelta < 0.2;
+			if #CompState == 0 && $StopConditions && #CompRunMin < 2 then
 				#SHifT = -5;
 			else
 				#SHifT = 0;
 			end
 		end
 		#SHifT = min(max(#SHifT, -5), 5);
-		$Z1HRT = #SHifT + #WCS;
+		$Z1HRT = $WCS + #SHifT;
 		if $Z1HRT != @Z1_Heat_Request_Temp then
 			@SetZ1HeatRequestTemperature = $Z1HRT;
 		end
@@ -142,12 +142,12 @@ end
 
 on timer=4 then
 	setTimer(4,60);
-	if #Heat && @ThreeWay_Valve_State == 0 && @Defrosting_State == 0 && #DHWRun < 1 then
+	if #Heat && @ThreeWay_Valve_State == 0 && @Defrosting_State == 0 && #DHWRun < 2 then
 		$OverNight = %hour > 22 || %hour < 3;
-		$HPOff1Conditions = (#RoomTempDelta > 0.7 && %hour > 9) || #RoomTempDelta > 1.5 || #chEnableOnTime < -30;
-		$HPOff2Conditions = #CompRunTime > 60 || #CompState == 0 || $OverNight;
+		$HPOff1Conditions = (#RoomTempDelta > 0.7 && %hour > 9) || #RoomTempDelta > 1.5 || #chEnableOnMin < -30;
+		$HPOff2Conditions = #CompRunMin > 60 || #CompState == 0 || $OverNight;
 		$HPOff3Conditions = #OutsideTemp > 4 || (#chEnable == 0 && $OverNight);
-		$chEnableCondition = #chEnable && #chEnableOnTime > 60 && (#CompRunTime < -60 || #CompRunTime < 60) && $OverNight != 1;
+		$chEnableCondition = #chEnable && #chEnableOnMin > 60 && (#CompRunMin < -60 || #CompRunMin < 60) && $OverNight != 1;
 		$HPOnCondition = (((#RoomTempDelta < 0.3 || %hour == 7) && #OutsideTemp < 11) || (#RoomTempDelta < 1 && #OutsideTemp < 2) || #RoomTempDelta < 0 || $chEnableCondition);
 		if #chEnable && $HPOnCondition && #HPStateR != 1 then
 				#HPStateR = 1;
@@ -158,19 +158,7 @@ on timer=4 then
 			end
 		end
 	end
-	$CoolingEnable = max(round(#CoolingEnable),0);
-	if $CoolingEnable && #DHWRun < 1 then
-		#OMR = 1;
-		#HPStateR = 1;
-		if #CompState then
-			$CoolReqTempMin = min(round(@Main_Outlet_Temp), 19); 
-		else 
-			$CoolReqTempMin = 0;
-		end
-		if @Z1_Cool_Request_Temp != ?coolingControl then
-			@SetZ1CoolRequestTemperature = max(?coolingControl, 12, $CoolReqTempMin);
-		end
-	elseif $CoolingEnable == 0 && #OMR && #DHWRun < 1 && #CompState == 0 then
+	if  #OMR && #DHWRun < 2 && #CompState == 0 then
 		#OMR = 0;
 		#HPStateR = 0;
 	end
@@ -179,11 +167,14 @@ end
 on timer=5 then
 	setTimer(5,900);
 	if @Defrosting_State == 0 && #dhwEnable then
-		if (%month > 3 || %month < 9) && %hour == 8 && #OutsideTemp > 20 then $DHWTime = 8;else $DHWTime = 13;end
-		if @ThreeWay_Valve_State == 0 && (@DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta - 10)|| 
-			(%hour > 9 && @DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta - 5))|| 
-			(%hour == $DHWTime && (%day == #DHWSterilizationDay || %day == 4 && @DHW_Temp < (@DHW_Target_Temp - 3) || @DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta)))) then
-			#DHWRun = 1;
+		if (%month > 3 || %month < 9) && %hour == 8 && #OutsideTemp > 20 then
+			$DHWTime = 8;
+		else
+			$DHWTime = 13;
+		end
+		$DHWT = %hour == $DHWTime;
+		if @ThreeWay_Valve_State == 0 && (@DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta - 10) || (%hour > 9 && @DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta - 5)) || (%hour == $DHWTime && (%day == #DHWSterilizationDay || %day == 4 && @DHW_Temp < (@DHW_Target_Temp - 3) || @DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta)))) then
+			#DHWRun = 2;
 			#OMP = @Operating_Mode_State;
 			#HPStateP = @Heatpump_State;
 			if #OMP == 0 then
@@ -195,12 +186,14 @@ on timer=5 then
 			end
 			#HPStateR = 1;
 		end
-		if #DHWRun == 1 then
+		if #DHWRun > 0 && #DHWRun < 3 then
 			if %day > (#DHWSterilizationDay - 2) && %hour > 10 && @DHW_Temp > 47 && @Sterilization_State != 1 then
 				@SetForceSterilization = 1;
 				#DHWSterilizationDay = #DHWSterilizationDay + 10;
 			end
-			if @ThreeWay_Valve_State == 0 && @DHW_Temp >= @DHW_Target_Temp && @Defrosting_State == 0 && @Sterilization_State == 0 then
+			if @ThreeWay_Valve_State == 0 && @DHW_Temp >= @DHW_Target_Temp && @Defrosting_State == 0 && @Sterilization_State == 1 then
+				#DHWRun = 1;
+			elseif @ThreeWay_Valve_State == 0 && @DHW_Temp >= @DHW_Target_Temp && @Defrosting_State == 0 && @Sterilization_State == 0 then
 				#OMR = max(0,#OMP);
 				#OMP = @Operating_Mode_State;
 				#HPStateR = #HPStateP;
@@ -228,7 +221,10 @@ on timer=6 then
 		if @Compressor_Freq == 0 && @Defrosting_State != 1 then
 			$MaxPumpDuty = 82;
 		else
-			$QFH = 10;$QFL = 16;$tH = 11;$tL = -3;
+			$QFH = 10;
+			$QFL = 16;
+			$tH = 11;
+			$tL = -3;
 			if #OutsideTemp >= $tH then
 				$MaxPumpFlow = $QFH;
 			elseif #OutsideTemp <= $tL then
@@ -264,7 +260,7 @@ on timer=7 then
 		else
 			#CompFreqTarget = 24;
 		end
-		if @Defrosting_State || #CompState < 1 || #CompRunTime < 10 || %hour < 7 || @Operating_Mode_State == 1 then
+		if @Defrosting_State || #CompState < 1 || #CompRunMin < 10 || %hour < 7 || @Operating_Mode_State == 1 then
 			#QMR = 3;
 		elseif @Compressor_Freq < #CompFreqTarget || (#QMR == 0 && @Compressor_Freq < #CompFreqTarget + 6) then
 			#QMR = 0;
@@ -294,7 +290,6 @@ on timer=8 then
 	?dhwTemp = round(@DHW_Temp);
 	?dhwSetpoint = @DHW_Target_Temp;
 	#dhwEnable = ?dhwEnable;
-	#CoolingEnable = #CoolingEnable + 0.1 * (?CoolingEnable - #CoolingEnable);
 	if ?chEnable then
 		if #chEnable == 0 then
 			#chEnableChangeTime = #Time;
@@ -311,11 +306,11 @@ on timer=8 then
 		end
 	end
 	if #chEnable then
-		#chEnableOnTime = #Time - #chEnableChangeTime;
+		#chEnableOnMin = #Time - #chEnableChangeTime;
 	else
-		#chEnableOnTime = #chEnableChangeTime - #Time;
+		#chEnableOnMin = #chEnableChangeTime - #Time;
 	end
-	?maxTSet = #WCS + 3;
+	?maxTSet = #WCS + 5;
 	?relativeModulation = round(@Compressor_Current / 15 * 100);
 	if #CompState > 0 then
 		?flameState = 1;
@@ -329,6 +324,7 @@ on timer=8 then
 		else
 			?dhwState = 0;
 		end
+
 	else
 		?flameState = 0;
 		?chState = 0;
@@ -359,14 +355,13 @@ on timer=9 then
 	setTimer(9,300);
 	if #DHWRun < 1 then
 		$RoomTempDelta = #RoomTempDelta * -1;
-		if (#RoomSetpoint > #RoomSetpointP && #RoomTempDelta < 1) || (#RoomSetpoint < #RoomSetpointP && #RoomTempDelta > -1) then
+		if (#RoomSetpoint > #RoomSetpointP && #RoomTempDelta < 0) || (#RoomSetpoint < #RoomSetpointP && #RoomTempDelta < -1) then
 			#PIDintegral = 0;
 		else
 			#PIDintegral = min(max((#PIDintegral + $RoomTempDelta), -50), 50);
 		end
-		$P = 2 * $RoomTempDelta;
-		$I = 0.1 * #PIDintegral;
-		$D = 0.2 * ($RoomTempDelta - #PIDpreverror);
+		$PIDKp = 3;$PIDKi = 0.1;$PIDKd = 0.2;
+		$P = $PIDKp * $RoomTempDelta;$I = $PIDKi * #PIDintegral;$D = $PIDKd * ($RoomTempDelta - #PIDpreverror);
 		$PIDoutput = $P + $I + $D;
 		if $RoomTempDelta == 0 || $RoomTempDelta > #PIDpreverror + 0.2 || $RoomTempDelta < #PIDpreverror - 0.2 then
 			#PIDpreverror = $RoomTempDelta;
