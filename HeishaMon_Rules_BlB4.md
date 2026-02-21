@@ -1,6 +1,6 @@
 ```LUA
 on System#Boot then
-	print('BLB Heishamon_rules_2512.02.lua');
+	print('BLB Heishamon_rules_2602.22d.lua');
 	#chEnableOnMin = -1;
 	#chEnableChangeTime = -1;
 	#chEnableTimeOff = -1;
@@ -37,7 +37,7 @@ on @Compressor_Freq then
 		#CompState = 1;
 		#CompRunSec = 0;
 		#CompRunMin = 0;
-		setTimer(11,5);
+		setTimer(11,1);
 	elseif @Compressor_Freq < 10 && #CompState > 0 then
 		#CompStateChangeTime = #Time;
 		#CompState = 0;
@@ -51,6 +51,7 @@ on timer=1 then
 	#Time = %day * 1440 + %hour * 60 + %minute;
 	if @Compressor_Freq > 10 then
 		#CompRunMin = #Time - #CompStateChangeTime;
+		if #CompRunMin < 0 then	#CompRunMin = #Time - #CompStateChangeTime + 10080;end
 	else
 		#CompRunMin = #CompStateChangeTime - #Time;
 	end
@@ -77,63 +78,53 @@ on timer=2 then
 		#DHWRun = 3;
 	end
 	#chEnable = ?chEnable;
+	#DHWTempP = @DHW_Temp;
 end
 
 on @Main_Outlet_Temp then
-	if @ThreeWay_Valve_State == 0 && #CompState > 0 then
-		$MOT = @Main_Outlet_Temp;
-		$TaDelta = @Main_Outlet_Temp - @Z1_Heat_Request_Temp;
-		if $TaDelta >= 3 then
-			@SetZ1HeatRequestTemperature = ceil(@Main_Outlet_Temp) - 2;
-		end
-	end
+	TaShift();
 end
 
 on timer=3 then
-	setTimer(3,15);
-	$NoDefrost = @Defrosting_State == 0 || (@Pump_Flow > 5 && @Pump_Flow < 30);
-	if #Heat && @ThreeWay_Valve_State == 0 && $NoDefrost && #DHWRun < 2 then
-		$WCS = #WCS + min(max(@Z2_Heat_Request_Temp - 30,0), 5);
-		#SHifT = @Z1_Heat_Request_Temp - $WCS;
+	$t3Timer = 60;
+	if #CompRunSec < 150 then
+		$t3Timer = 15;
+	end
+	setTimer(3,$t3Timer);
+	TaShift();
+end
+
+on TaShift then
+	#NoDefrost = @Defrosting_State == 0 || (@Pump_Flow > 5 && @Pump_Flow < 30);
+	if #Heat && @ThreeWay_Valve_State == 0 && #DHWRun < 2 && #NoDefrost then
 		if #CompState > 0 then
-			if #OutsideTemp < 8 then
-				if #RoomTempDelta > 2 || %hour < 3 then
-					#SHifT = -3;
-				elseif #CompRunSec < 1080 then
-					#SHifT = floor((#CompRunSec ^ 0.5 - 28) / 5.16);
-					if #RoomTempControl < 0 then
-						#SHifT = #SHifT + #RoomTempControl;
-					end
-				elseif #RoomTempControl > #SHifT || @Compressor_Freq > 21 then
-					#SHifT = #RoomTempControl;
-				end
+			$WCS = #WCS + min(max(@Z2_Heat_Request_Temp - 20,-5), 5);
+			#TaDelta = @Main_Outlet_Temp - @Z1_Heat_Request_Temp;
+			if #OutsideTemp > 7 && #CompRunSec < 150 && #CompRunSec != -1 then
+				#SHifT = ceil(@Main_Outlet_Temp) - 3 - $WCS;
 			else
-				$TaDelta = @Main_Outlet_Temp - @Z1_Heat_Request_Temp;
-				if $TaDelta < 2 then
-					#TaDeltaTimer = 0;
-				else
-					#TaDeltaTimer = #TaDeltaTimer + 1;
-				end
-				if $TaDelta >= 3 then
-					#SHifT = ceil(@Main_Outlet_Temp) - 2 - $WCS;
-				elseif #TaDeltaTimer < 5 then
-					#TaDeltaTimer = #TaDeltaTimer;
-				elseif (@Main_Outlet_Temp - 1.8) > (#RoomTempControl + $WCS) && (#CompRunMin < 30 || #RoomTempDelta < 0 || #chEnable == 1) then
-					#SHifT = ceil(@Main_Outlet_Temp - 1.8 - $WCS);
-				else
-					#SHifT = #RoomTempControl;
-				end
+				#SHifT = max(#RoomTempControl,ceil(@Main_Outlet_Temp) - 2 - $WCS);
 			end
+			if #TaDelta < 2 then
+				#TaDeltaTimer = 0;
+			elseif #TaDeltaTimer == 0 then
+				setTimer(12,10);
+			elseif #TaDeltaTimer >= 180 then
+				#SHifT = ceil(@Main_Outlet_Temp - 1.8 - $WCS);
+			end
+			if #TaDelta >= 3 then
+				#SHifT = ceil(@Main_Outlet_Temp) - 2 - $WCS;
+			end
+		elseif (#CompRunMin > (-2 * #OutsideTemp - 30) || %hour < 7 || %hour > 22 || #RoomTempDelta > 0.2) then
+			#SHifT = -5;
 		else
-			$StopConditions = #CompRunMin > (-2 * #OutsideTemp - 30) || %hour < 7 || %hour > 22 || #RoomTempDelta < 0.2;
-			if #CompState == 0 && $StopConditions && #CompRunMin < 2 then
-				#SHifT = -5;
-			else
-				#SHifT = 0;
-			end
+			#SHifT = 0;
 		end
 		#SHifT = min(max(#SHifT, -5), 5);
-		$Z1HRT = $WCS + #SHifT;
+		$Z1HRT = max($WCS + #SHifT,27);
+		if @Z2_Heat_Request_Temp > 25 then
+			$Z1HRT = @Z2_Heat_Request_Temp;
+		end
 		if $Z1HRT != @Z1_Heat_Request_Temp then
 			@SetZ1HeatRequestTemperature = $Z1HRT;
 		end
@@ -147,8 +138,8 @@ on timer=4 then
 		$HPOff1Conditions = (#RoomTempDelta > 0.7 && %hour > 9) || #RoomTempDelta > 1.5 || #chEnableOnMin < -30;
 		$HPOff2Conditions = #CompRunMin > 60 || #CompState == 0 || $OverNight;
 		$HPOff3Conditions = #OutsideTemp > 4 || (#chEnable == 0 && $OverNight);
-		$chEnableCondition = #chEnable && #chEnableOnMin > 60 && (#CompRunMin < -60 || #CompRunMin < 60) && $OverNight != 1;
-		$HPOnCondition = (((#RoomTempDelta < 0.3 || %hour == 7) && #OutsideTemp < 11) || (#RoomTempDelta < 1 && #OutsideTemp < 2) || #RoomTempDelta < 0 || $chEnableCondition);
+		$chEnableCondition = #chEnable && #chEnableOnMin > 60 && #CompRunMin < -60 && $OverNight != 1;
+		$HPOnCondition = (((#RoomTempDelta < 0.3 || %hour == 7) && #OutsideTemp < 11) || (#RoomTempDelta < 1 && #OutsideTemp < 2) || #RoomTempDelta < 0 || ($chEnableCondition && #RoomTempDelta < 2));
 		if #chEnable && $HPOnCondition && #HPStateR != 1 then
 				#HPStateR = 1;
 		elseif $HPOff1Conditions && $HPOff2Conditions && $HPOff3Conditions && $chEnableCondition == 0 && #HPStateR != 0 then
@@ -158,7 +149,19 @@ on timer=4 then
 			end
 		end
 	end
-	if  #OMR && #DHWRun < 2 && #CompState == 0 then
+	$CoolingEnable = max(round(#CoolingEnable),0);
+	if $CoolingEnable && #DHWRun < 2 then
+		#OMR = 1;
+		#HPStateR = 1;
+		if #CompState then
+			$CoolReqTempMin = min(round(@Main_Outlet_Temp), 19);
+		else 
+			$CoolReqTempMin = 0;
+		end
+		if @Z1_Cool_Request_Temp != ?coolingControl then
+			@SetZ1CoolRequestTemperature = max(?coolingControl, 12, $CoolReqTempMin);
+		end
+	elseif $CoolingEnable == 0 && #OMR && #DHWRun < 2 && #CompState == 0 then
 		#OMR = 0;
 		#HPStateR = 0;
 	end
@@ -167,13 +170,13 @@ end
 on timer=5 then
 	setTimer(5,900);
 	if @Defrosting_State == 0 && #dhwEnable then
+		$DHWTime = 13;
 		if (%month > 3 || %month < 9) && %hour == 8 && #OutsideTemp > 20 then
 			$DHWTime = 8;
-		else
-			$DHWTime = 13;
+		elseif #OutsideTemp < 4 then
+			$DHWTime = 0;
 		end
-		$DHWT = %hour == $DHWTime;
-		if @ThreeWay_Valve_State == 0 && (@DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta - 10) || (%hour > 9 && @DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta - 5)) || (%hour == $DHWTime && (%day == #DHWSterilizationDay || %day == 4 && @DHW_Temp < (@DHW_Target_Temp - 3) || @DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta)))) then
+		if @ThreeWay_Valve_State == 0 && (@DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta - 10) || (%hour > 9 && (@DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta - 5) || @DHW_Temp < #DHWTempP - 5 )) || (%hour == $DHWTime && ((%day == #DHWSterilizationDay && @DHW_Temp < 63) || %day == 4 && @DHW_Temp < (@DHW_Target_Temp - 3) || @DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta)))) then
 			#DHWRun = 2;
 			#OMP = @Operating_Mode_State;
 			#HPStateP = @Heatpump_State;
@@ -185,13 +188,12 @@ on timer=5 then
 				#OMR = 3;
 			end
 			#HPStateR = 1;
-		end
-		if #DHWRun > 0 && #DHWRun < 3 then
-			if %day > (#DHWSterilizationDay - 2) && %hour > 10 && @DHW_Temp > 47 && @Sterilization_State != 1 then
+		elseif #DHWRun > 0 && #DHWRun < 3 then
+			if %day > (#DHWSterilizationDay - 2) && @ThreeWay_Valve_State == 1 && 
+				#CompState > 0 && @Sterilization_State != 1 then
 				@SetForceSterilization = 1;
 				#DHWSterilizationDay = #DHWSterilizationDay + 10;
-			end
-			if @ThreeWay_Valve_State == 0 && @DHW_Temp >= @DHW_Target_Temp && @Defrosting_State == 0 && @Sterilization_State == 1 then
+			elseif @ThreeWay_Valve_State == 0 && @DHW_Temp >= @DHW_Target_Temp && @Defrosting_State == 0 && @Sterilization_State == 1 then
 				#DHWRun = 1;
 			elseif @ThreeWay_Valve_State == 0 && @DHW_Temp >= @DHW_Target_Temp && @Defrosting_State == 0 && @Sterilization_State == 0 then
 				#OMR = max(0,#OMP);
@@ -204,12 +206,13 @@ on timer=5 then
 		if %day == (#DHWSterilizationDay - 10) && %hour > 15 then
 			#DHWSterilizationDay = #DHWSterilizationDay - 10;
 		end
+		#DHWTempP = @DHW_Temp;
 	end
 end
 
 on timer=6 then
 	setTimer(6, 60);
-	$MaxPumpDuty = 82;
+	$MaxPumpDuty = 102 - 4 * @Heat_Delta;
 	if @ThreeWay_Valve_State then
 		$MaxPumpDuty = 140;
 		if (@Sterilization_State == 0 && @DHW_Temp > @DHW_Target_Temp) || (@Sterilization_State && @DHW_Temp > 57) then
@@ -219,19 +222,9 @@ on timer=6 then
 		$MaxPumpDuty = 92;
 	elseif @Heatpump_State then
 		if @Compressor_Freq == 0 && @Defrosting_State != 1 then
-			$MaxPumpDuty = 82;
+			$MaxPumpDuty = 102 - 4 * @Heat_Delta;
 		else
-			$QFH = 10;
-			$QFL = 16;
-			$tH = 11;
-			$tL = -3;
-			if #OutsideTemp >= $tH then
-				$MaxPumpFlow = $QFH;
-			elseif #OutsideTemp <= $tL then
-				$MaxPumpFlow = $QFL;
-			else
-				$MaxPumpFlow = ceil($QFH + ($tH - #OutsideTemp) * ($QFL - $QFH) / ($tH - $tL));
-			end
+			$MaxPumpFlow = min(max(ceil(10 + (11 - #OutsideTemp) * 6 / 14), 10), 16);
 			if @Pump_Flow > 1 && @Pump_Flow < 8 && $MaxPumpDuty <= @Max_Pump_Duty then
 				$MaxPumpDuty = @Max_Pump_Duty + 1;
 			else
@@ -254,31 +247,26 @@ end
 
 on timer=7 then
 	setTimer(7,120);
-	if @Defrosting_State == 0 then
-		if #OutsideTemp < 4 || (#OutsideTemp < 6 && #CompFreqTarget == 34) then
-			#CompFreqTarget = 34;
-		else
-			#CompFreqTarget = 24;
-		end
-		if @Defrosting_State || #CompState < 1 || #CompRunMin < 10 || %hour < 7 || @Operating_Mode_State == 1 then
-			#QMR = 3;
-		elseif @Compressor_Freq < #CompFreqTarget || (#QMR == 0 && @Compressor_Freq < #CompFreqTarget + 6) then
-			#QMR = 0;
-		elseif @Compressor_Freq < #CompFreqTarget + 6 || (#QMR == 1 && @Compressor_Freq < #CompFreqTarget + 12) then
-			#QMR = 1;
-		elseif @Compressor_Freq < #CompFreqTarget + 26 || (#QMR == 2 && @Compressor_Freq < #CompFreqTarget + 32) then
-			#QMR = 2;
-		else
-			#QMR = 3;
-		end
-		if #QMR > 0 && @ThreeWay_Valve_State && %hour > 9 && %hour < 17 then
-			$QMDHW = -1;
-		else
-			$QMDHW = 0;
-		end
-		if #QMR != @Quiet_Mode_Level then
-			@SetQuietMode = #QMR + $QMDHW;
-		end
+	#CompFreqTarget = min(max(ceil(24 + (6 - #OutsideTemp) * 30 / 9), 24), 54);
+	if @Defrosting_State || #CompState < 1 || #CompRunMin < 5 || %hour < 7 || @Operating_Mode_State == 1 then
+		#QMR = 3;
+	elseif @Compressor_Freq < #CompFreqTarget || (#QMR == 0 && @Compressor_Freq < #CompFreqTarget + 6) then
+		#QMR = 0;
+	elseif @Compressor_Freq < #CompFreqTarget + 6 || (#QMR == 1 && @Compressor_Freq < #CompFreqTarget + 12) then
+		#QMR = 1;
+	elseif @Compressor_Freq < #CompFreqTarget + 26 || (#QMR == 2 && @Compressor_Freq < #CompFreqTarget + 32) then
+		#QMR = 2;
+	else
+		#QMR = 3;
+	end
+	$QMDHW = 0;
+	if #QMR > 0 && @ThreeWay_Valve_State && %hour > 9 && %hour < 17 then
+		$QMDHW = -1;
+	end
+	if @Buffer_Tank_Delta < 4 then
+		@SetQuietMode = @Buffer_Tank_Delta;
+	elseif #QMR != @Quiet_Mode_Level then
+		@SetQuietMode = #QMR + $QMDHW;
 	end
 end
 
@@ -290,6 +278,7 @@ on timer=8 then
 	?dhwTemp = round(@DHW_Temp);
 	?dhwSetpoint = @DHW_Target_Temp;
 	#dhwEnable = ?dhwEnable;
+	#CoolingEnable = #CoolingEnable + 0.1 * (?CoolingEnable - #CoolingEnable);
 	if ?chEnable then
 		if #chEnable == 0 then
 			#chEnableChangeTime = #Time;
@@ -324,11 +313,16 @@ on timer=8 then
 		else
 			?dhwState = 0;
 		end
-
+		if @Cool_Power_Consumption > 0 then
+			?coolingState = 1;
+		else	
+			?coolingState = 0;
+		end
 	else
 		?flameState = 0;
 		?chState = 0;
 		?dhwState = 0;
+		?coolingState = 0;
 	end
 	#RoomSetpoint = min(max(?roomTempSet, 10), 22);
 	if ?maxRelativeModulation != 100 then
@@ -360,9 +354,7 @@ on timer=9 then
 		else
 			#PIDintegral = min(max((#PIDintegral + $RoomTempDelta), -50), 50);
 		end
-		$PIDKp = 3;$PIDKi = 0.1;$PIDKd = 0.2;
-		$P = $PIDKp * $RoomTempDelta;$I = $PIDKi * #PIDintegral;$D = $PIDKd * ($RoomTempDelta - #PIDpreverror);
-		$PIDoutput = $P + $I + $D;
+		$PIDoutput = 3 * $RoomTempDelta + 0.1 * #PIDintegral + 0.2 * ($RoomTempDelta - #PIDpreverror);
 		if $RoomTempDelta == 0 || $RoomTempDelta > #PIDpreverror + 0.2 || $RoomTempDelta < #PIDpreverror - 0.2 then
 			#PIDpreverror = $RoomTempDelta;
 		end	
@@ -373,23 +365,22 @@ end
 
 on timer=10 then
 	setTimer(10,1800);
-	$Ta1 = @Z1_Heat_Curve_Target_Low_Temp;
-	$Tb1 = @Z1_Heat_Curve_Outside_High_Temp;
-	$Ta2 = 34;
-	$Tb2 = @Z1_Heat_Curve_Outside_Low_Temp;
-	if #OutsideTemp >= $Tb1 then
-		#WCS = $Ta1;
-	elseif #OutsideTemp <= $Tb2 then
-		#WCS = $Ta2;
-	else
-		#WCS = ceil($Ta1 + (($Tb1 - #OutsideTemp) * ($Ta2 - $Ta1) / ($Tb1 - $Tb2)));
-	end
+	$Ta2 = 36;
+	#WCS = min(max(ceil(@Z1_Heat_Curve_Target_Low_Temp + (@Z1_Heat_Curve_Outside_High_Temp - #OutsideTemp) * ($Ta2 - @Z1_Heat_Curve_Target_Low_Temp) / (@Z1_Heat_Curve_Outside_High_Temp - @Z1_Heat_Curve_Outside_Low_Temp)),@Z1_Heat_Curve_Target_Low_Temp), $Ta2);
 end
 
 on timer=11 then
 	#CompRunSec = #CompRunSec + 5;
 	if #CompRunSec < 1100 then
 		setTimer(11,5);
+	end
+end
+
+on timer=12 then
+	$t12Timer = 10;
+	if #TaDeltaTimer < 200 && #TaDelta >= 2 then
+		#TaDeltaTimer = #TaDeltaTimer + $t12Timer;
+		setTimer(12,$t12Timer);
 	end
 end
 ```
