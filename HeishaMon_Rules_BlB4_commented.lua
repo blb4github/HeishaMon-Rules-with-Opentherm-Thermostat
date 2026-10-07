@@ -4,59 +4,13 @@
 This is my ruleset I use on my HeishaMon to control my Panasonic Heat Pump in combination with an Opentherm thermostat. I try to keep it as univeral as possible but it is at the end 
 taylored to my situation and needs. You can just copy it and start using it (at your own risk) or, better, you can use is as inspiration for your own rules set.
 
-Release
-20241215	improved OpenThermThermostat to prevent switching off HP early morning as #RoomSetpoint will be increased around 09:00u
-20241216	changed OpenThermThermostat to turn on HP when RTD < 0.2 (before < 0.3)
-20241217	replaced rule on HeatPumpState by syncHP
-20241229	additional rule in OTT to switch on HP if outside temperature is low
-20250103	call DHW and QuietMode only if @Defrosting_State == 0, call TaSHifT and OTT only if @ThreeWay_Valve_State && @Defrosting_State == 0
-20250104	Fixed (and simplified) locig on OTT to avoid overlapping conditions
-20250104	start PID logic for TaSHifT
-20250120	added new TaSHifT logic for outsideTemp < 5 to improve logic during defrost mania
-20250120	simplified conditions == 1 by removing these == 1 where possible 
-20250122	corrected QuietMode with introduction of $QMDHW
-20250128	added check to modify RoomTemp only if value isn't 20 (due to OT problem)
-20250129	modified logic TaSHifT to add #RoomTempControl to #SHifT earlier than after 20 minutes runtime if possible
-20250206	changed to direct heat_mode and compensation curve calculations within the rules set, avoiding compressor switch off due to uncontrolled Target shift.
-20250215	added ?dhwEnable condition to DHW function to control DHW on/of as well with ?dhwEnable
-20250707	added logic to switch to cooling
-20251005	1) removed @Force_DHW_State logic, 2) simplified TaShift logic (less code), 3) moved Cooling logic from sync OpenTherm & Heatpump rule to OpenThermThermostat rule
-2510.03		1) new version numbering (YYMM.XX) where XX is from 00 to 99, 2) PID function only running if no DHWRun
-2510.06		changed logic for chEnableOffTime to be able to use as well the duration chEnable is on
-2510.18		1) added @Main_Outlet_Temp logic to increase setpoint if MOT > HRT + 3, 2) reduced lines by removing #chEnable and #PIDKx variables from System#Boot,
-		3) changed #chEnableOffTime to #chEnableOnMin with improved logic
-2510.33		1) removed all #ExternalOverRide logic to reduce code due to HeishaMon rules errors
-2511.15		1) added #CompRunMin = 0 to @Compressor_Freq logic, 2) added $DHWTime logic to do DHW run early morning during Hot days, 3) Improved ?maxTSet logic
-2511.16		added more explenation about all rules
-2511.17		added $WCS funtion to be able to override to a higher HRT based on @Z2_Heat_Request_Temp
-2511.19		Corrected reset of #PIDIntegral in PID function
-2511.23		1) changed #chEnableOnTime to #chEnableOnMin and #CompRunTime to #CompRunMin for clarity, 
-		2) added #chEnableChangeTime	= #Time; to t2 (initiate variables) to have correct duration for #chEnableOnMin after boot.
-2512.01		1) disabled cooling to have less lines (rules set too long), 2) $PIDKp changed from 2 to 3 in PID function
-2512.03		added && #RoomTempDelta < 2 to $HPOnCondition in OpenThermThermostat to avoid run if during night the roomtemp is way too high, despite chenable on due to other rooms heat request.
-2512.05		Added DHWRun condition; DHW Temp 5 degrees below previous DHW Temp.
-2512.08		Changed #Shift manipulation options: default: 20, 15..25: -5..+5 shift, >25:direct temperature
-2601.01		2601.01 added @DHW_Temp < 63 check to DHW function
-2601.02		1) $MaxPumpDuty more variable, based on @Heat_Delta & @Cool_Delta in PumpDuty function, 2) added DHWTime = 0 during very cold weather in DHW fuction
-2601.03		added #QMR override via @Buffer_Tank_Delta, if above 4 normal operation, otherwise #QMR = @Buffer_Tank_Delta
-2601.06		1) Corrected #Quietmode to get #QMR 3 during @Defrost, added max( ,xx) to TaSHifT
-2601.08		Changed 47 to 47 degrees in DHW function as Sterilisation was often activated after OM was changed back to Heat only.
-2602.01		DHW logic a bit changed.
-2602.03		reduced code size: adjusted chEnableCondition to depend on compressor off > 60 min; simplified PumpDuty flow calc (original constants kept in comment), and PID math
-2602.06		reduced code size: DHWTime default+override; comp freq target via clamped formula
-2602.07		reduced code size: set QMDHW default then override on DHW daytime condition
-2602.16		Complete rewrite of TaSHifT logic to make it more simple and effective, with less code and better handling of TaDelta by introducing #TaDeltaTimer which is increased every 15s
-		if TaDelta > 2 degrees and reset to 0 if TaDelta < 2 degrees, and using #TaDeltaTimer in the TaShift logic to increase shift if TaDelta is > 2 degrees for more than 200s.
-2602.17		1) added logic to set lower timer value during first 3 minutes of compressor run to prevent early switch off due to too high To > HRT delta,
-		2) added @Main_Outlet_Temp trigger to prevent Compressor switch off at the start of the run due to too high temperature delta.
-2602.19		1) simplified weather compensation curve calculation by using direct formula, in timer=6, timer=7 and timer=10. 
-		2) corrected if #CompState == 1 to if #CompState > 0 in TaShift to prevent issues with #CompState = 2 during boot when compressor is already running.
-2602.22		Since new firmware (V4 alpha) the rules set can be longer!! as a result all commented lines related to cooling enabled and working now! Also some other
-	 	commented lines uncoommented to have more functionality. This version is build from 2602.19, check .20 and .21 for other changes which are not in 2602.22.
+Release 2609.02
+Consolidated changes since published version 2602.22d.
+See CHANGELOG.md for the release notes; intermediate local versions are omitted.
 
 **My environment:**
 a) Panasonic WH-MDC07J3E5 Heat Pump used for heating, Cooling and DHW (external tank);
-b) HeishaMon Large with CZ-TAW1 on proxy port (required for warranty, I don't use this CZ-TAW1 actively);
+b) HeishaMon Large with firmware version Alpha-f7ae839/Alpha-d8af83f 4.0 with CZ-TAW1 on proxy port (required for warranty, I don't use this CZ-TAW1 actively);
 c) Honeywell Evohome Opentherm Thermostat (R8810 bridge) connected via OpenTherm Gateway;
 d) Honeywell Evohome & OpenTherm Gateway integration in Home Assistant to communicate several parameters  to HeishaMon like RoomTemperatureDelta as chSetpoint from Evohome is not reliable, target room 
    temperature and current room temperature are not communicated towards 'boiler';
@@ -74,8 +28,8 @@ e) Settings Heat Pump: Heating_Mode: 1 (direct), Cooling_Mode: 1 (direct), Buffe
 ** rules:**
 01) System#Boot			initiate ruleset 
 02) @Compressor_Freq		set a number of variables & timers based on start or stop compressor
-03) t1  time(r) reference	main compressor run timer (#CompRunMin)
-04) t2  initiate variables	initial values direct after boot which can't be done in System#Boot because @heatpump and ?OpenTherm variables are not yet set at system boot
+03) t2  time(r) reference	main compressor run timer (#CompRunMin)
+04) t1  initiate variables	initial values direct after boot which can't be done in System#Boot because @heatpump and ?OpenTherm variables are not yet set at system boot
 05) @Main_Outlet_Temp		logic to increase setpoint if MOT > HRT + 3 to prevent immediate compressor switch off
 06) t3  TaSHifT			optimize HRT for a) comfort, b) effectiveness and c) long runs. see also t7, t9 and t10
 07) t4  OpenThermThermostat	control HP Heat & Cool prodcution by the Opentherm Thermostat
@@ -96,7 +50,7 @@ e) Settings Heat Pump: Heating_Mode: 1 (direct), Cooling_Mode: 1 (direct), Buffe
 *Called by*:	system Boot
 rule 01]]
 on System#Boot then
-	print('BLB Heishamon_rules_2602.22d.lua');
+	print('BLB Heishamon_rules_2609.02.lua');
 	#chEnableOnMin = -1;			-- Duration (in Minutes) chEnable on (positive) or off (negative)
 	#chEnableChangeTime = -1;		-- Time #chEnable changes
 	#chEnableTimeOff = -1;			-- Time ?chEnable goes off (0)
@@ -104,19 +58,19 @@ on System#Boot then
 	#CompRunSec = -1;			-- Duration (in seconds) the compressor is running during start phase
 	#CompRunMin = -1;			-- Duration (in minutes) the compressor is running or not running (negative time)
 	#CoolingEnable = -1;			-- #CoolingEnable is clean ?CoolingEnable
+	#Debug = 1;				-- Debug options. 0: No, 1: All
 	#DHWComfortDay = 4;			-- An optional day DHW run is always required
-	#dhwEnable = -1;			-- Yes/No DHW enabled
 	#DHWRun = -1;				-- DHWRun state (0: off, 1: DHWRun almost done (3-way valve back to ROOM, 2: on via rules, 3: on discovered during rules boot)
 	#DHWSterilizationDay = 7;		-- Day of the week the Sterilization Run must be performed (1 = Sunday, 7 = Saturday)
 	#Heat = -1;				-- HP in OM which includes Heat
 	#OMP = -1;				-- Previous Operating Mode
 	#QMR = -1;				-- Required Quiet Mode
-	#PIDpreverror	= 0;			-- PID previous error for the Integral function
-	#PIDintegral	= 0;			-- cummulative Integral value
+	#PIDpreverror = 0;			-- PID previous error for the Integral function
+	#PIDintegral = 0;			-- cummulative Integral value
 	#RoomTempDelta = 0;			-- Delta between Room Setpoint and Room Temp (positive = temp above setpoint)
 	#RoomTempControl = 0;			-- SHifT Ta as result of #RoomTempDelta
-	setTimer(1,10);				-- timer for time reference. Must be called earlier than timer=2
-	setTimer(2,30);				-- function to set initial values from HP after boot which are not yet available when HeishaMon boots.
+	setTimer(1,10);				-- function to set initial values from HP after boot which are not yet available when HeishaMon boots.
+	setTimer(2,20);				-- timer for time reference.
 	setTimer(3,35);				-- TaSHifT function
 	setTimer(4,40);				-- OTT function
 	setTimer(5,45);				-- DHW function
@@ -128,11 +82,66 @@ on System#Boot then
 end
 
 --[[
+**timer=1, initial values direct after boot**
+*Purpose*:	function to set initial values from HP after boot which are not yet available when HeishaMon boots
+*Explanation*:	see comments below
+*Called by*:	System#Boot
+rule 02]]
+on timer=1 then
+	#Time = %day * 1440 + %hour * 60 + %minute;							-- #time is a time reference (integer) which is update (+1) every minute.
+	#CompStateChangeTime = #Time;									-- set intitial Time for the compressor state
+	#chEnableChangeTime = #Time;									-- set intitial Time for the chEnable state
+	#HPStateR = @Heatpump_State;									-- set Required Heat Pump state to current state
+	#HPStateP = @Heatpump_State;									-- set Previous Heat Pump state as well to current state
+	#OMR = @Operating_Mode_State;									-- set Required Operating Mode to current state
+	#OutsideTemp = @Outside_Temp;									-- set OusideTemp
+	#RoomSetpoint = min(max(?roomTempSet, 10), 22);							-- Room Setpoint
+	#RoomSetpointP = #RoomSetpoint;									-- Previous Room Setpoint
+	#RoomTemp = 15 + ?maxRelativeModulation / 10;							-- Room Temperature. if ?MaxRelativeModulation is 0, RoomTemp will be 15 degrees which means the Heating is off.
+	#WCS = @Z1_Heat_Request_Temp;									-- set initial Weather Compensation Setpoint to current @Z1_Heat_Request_Temp
+	if @Compressor_Freq > 18 then									-- set #CompState & #CompRunSec to values to indicate compressor is running during first boot
+		#CompState  = 2;									-- Compressor running state (0/1, 2 if already running during rules boot)
+		#CompRunSec = 1999;									-- set #CompRunSec to 1999 to indicated Compressor was running during boot
+	else
+		#CompState  = 0;									-- set #CompState to 0 if compressor is not running during boot
+	end
+	if @ThreeWay_Valve_State then									-- set #DHWRun to 3 if HP is busy with DHW run during boot
+		#DHWRun = 3;
+	end
+	#chEnable = ?chEnable;										-- #chEnable is clean ?chEnable
+	#DHWTempP = @DHW_Temp;
+end
+
+--[[
+**timer=2, time reference**
+*Purpose*:	timer for time reference which is updated every minute and, based on this, setting Compressor run time (positive for the time running, negative for the time not running)
+*Explanation*:	Several functions need information like how long Compressor is running or not running, ?chEnable is off etc. This function generates variable #Time which is +1 every minute during the week and resets
+		to 0 on sunday 00:00u. #CompRunMin is set based on #CompStateChangeTime and current #Time with a correction for #Time roll over to 0. 
+*Called by*:	System#Boot initially, setTimer(2,60) in function itselfs
+rule 03]]
+on timer=2 then
+	setTimer(2,60);											-- run this rule every minute.
+	#Time = %day * 1440 + %hour * 60 + %minute;							-- #time is a time reference (integer) which is update (+1) every minute.
+	$CompElapsed = (#Time - #CompStateChangeTime + 10080) % 10080;
+	if @Compressor_Freq > 10 then									-- above 10 for sure the compressor is running
+		#CompRunMin = $CompElapsed;
+	else
+		#CompRunMin = 0 - $CompElapsed;
+	end
+--[[	if @Compressor_Freq > 10 then									-- above 10 for sure the compressor is running
+		#CompRunMin = #Time - #CompStateChangeTime;						-- update #CompRunMin
+		if #CompRunMin < 0 then	#CompRunMin = #Time - #CompStateChangeTime + 10080;	end	-- correct #CompRunMin if #Time did roll over to 0
+	else
+		#CompRunMin = #CompStateChangeTime - #Time;						-- #ComRunTime will be count down from 0 to measure time the compressor is off
+	end ]]
+end
+
+--[[
 **@Compressor_Freq**
 *Purpose*:	set #CompState based on @Compressor_Freq, set #CompStateChangeTime when Compressor State changes and start timer 11 (#CompRunSec) when Compressor starts.
 *Explanation*:	see comment below
 *Called by*:	@Compressor_Freq
-rule 02]]
+rule 04]]
 on @Compressor_Freq then
 	if @Compressor_Freq > 10 && #CompState == 0 then						-- condition is true if compressor starts
 		#CompStateChangeTime = #Time;								-- set #CompStateChangeTime on the moment the Compressor is switched on
@@ -146,54 +155,6 @@ on @Compressor_Freq then
 		#CompRunMin = 0;
 		#TaDeltaTimer = 0;
 	end
-end
-
---[[
-**timer=1, time reference**
-*Purpose*:	timer for time reference which is updated every minute and, based on this, setting Compressor run time (positive for the time running, negative for the time not running)
-*Explanation*:	Several functions need information like how long Compressor is running or not running, ?chEnable is off etc. This function generates variable #Time which is +1 every minute during the week and resets
-		to 0 on sunday 00:00u. #CompRunMin is set based on #CompStateChangeTime and current #Time with a correction for #Time roll over to 0. 
-*Called by*:	System#Boot initially, setTimer(1,60) in function itselfs
-rule 03]]
-on timer=1 then
-	setTimer(1,60);											-- run this rule every minute.
-	#Time = %day * 1440 + %hour * 60 + %minute;							-- #time is a time reference (integer) which is update (+1) every minute.
-	if @Compressor_Freq > 10 then									-- above 10 for sure the compressor is running
-		#CompRunMin = #Time - #CompStateChangeTime;						-- update #CompRunMin
-		if #CompRunMin < 0 then	#CompRunMin = #Time - #CompStateChangeTime + 10080;	end	-- correct #CompRunMin if #Time did roll over to 0
-	else
-		#CompRunMin = #CompStateChangeTime - #Time;						-- #ComRunTime will be count down from 0 to measure time the compressor is off
-	end
-end
-
---[[
-**timer=2, initial values direct after boot**
-*Purpose*:	function to set initial values from HP after boot which are not yet available when HeishaMon boots
-*Explanation*:	see comments below
-*Called by*:	System#Boot
-rule 04]]
-on timer=2 then
-	#CompStateChangeTime	= #Time;								-- set intitial Time for the compressor state
-	#chEnableChangeTime	= #Time;								-- set intitial Time for the chEnable state
-	#HPStateR      = @Heatpump_State;								-- set Required Heat Pump state to current state
-	#HPStateP      = @Heatpump_State;								-- set Previous Heat Pump state as well to current state
-	#OMR 	       = @Operating_Mode_State;								-- set Required Operating Mode to current state
-	#OutsideTemp   = @Outside_Temp;									-- set OusideTemp
-	#RoomSetpoint  = min(max(?roomTempSet, 10), 22);						-- Room Setpoint
-	#RoomSetpointP = #RoomSetpoint;									-- Previous Room Setpoint
-	#RoomTemp      = 15 + ?maxRelativeModulation / 10;						-- Room Temperature
-	#WCS 	       = @Z1_Heat_Request_Temp;								-- set initial Weather Compensation Setpoint to current @Z1_Heat_Request_Temp
-	if @Compressor_Freq > 18 then									-- set #CompState & #CompRunSec to values to indicate compressor is running during first boot
-		#CompState  = 2;									-- Compressor running state (0/1, 2 if already running during rules boot)
-		#CompRunSec = 1999;									-- set #CompRunSec to 1999 to indicated Compressor was running during boot
-	else
-		#CompState  = 0;									-- set #CompState to 0 if compressor is not running during boot
-	end
-	if @ThreeWay_Valve_State then									-- set #DHWRun to 3 if HP is busy with DHW run during boot
-		#DHWRun = 3;
-	end
-	#chEnable = ?chEnable;										-- #chEnable is clean ?chEnable
-	#DHWTempP = @DHW_Temp;
 end
 
 --[[
@@ -214,7 +175,7 @@ end
 
 on timer=3 then
 	$t3Timer = 60;											-- default timer value for TaShift
-	if #CompRunSec < 150 then
+	if #CompRunSec < 150 || #TaDeltaTimer > 0 then
 		$t3Timer = 15;										-- set lower timer value during first 3 minutes of compressor run to prevent early switch off due to too high To > HRT delta
 	end
 	setTimer(3,$t3Timer);										-- run every minute, can be set to lower value (e.g. 30s) if you want faster response but will give more log output
@@ -223,47 +184,57 @@ end
 
 on TaShift then
 	#NoDefrost = @Defrosting_State == 0 || (@Pump_Flow > 5 && @Pump_Flow < 30);			-- define NoDefrost to avoid TaShift during defrost or when flow is too low (during defrost)
-	if #Heat && @ThreeWay_Valve_State == 0 && #DHWRun < 2 && #NoDefrost then			-- TaShift only required during certain conditions
+	if #Heat == 1 && @ThreeWay_Valve_State == 0 && #DHWRun < 2 && #NoDefrost == 1 then		-- TaShift only required during certain conditions
 		if #CompState > 0 then									-- Compressor is running
 		--	$WCS = #WCS;									-- default WCS to current WCS
 		--	if @Z2_Heat_Request_Temp < 26 then
 			$WCS = #WCS + min(max(@Z2_Heat_Request_Temp - 20,-5), 5);			-- Adjust Weather Compensation Setpoint based on override Z2 Heat Request Temp, with a maximum shift of -5 to +5 degrees
 		--	end
 			#TaDelta = @Main_Outlet_Temp - @Z1_Heat_Request_Temp;				-- Delta between Main Outlet Temp and Heat Request Temp
-			if #OutsideTemp > 7 && #CompRunSec < 150 && #CompRunSec != -1 then
+			if #OutsideTemp > 7 && #CompRunSec < 130 && #CompRunSec != -1 then		-- 2603.07 changed #CompRunSec < 150 to #CompRunSec < 130
 				#SHifT = ceil(@Main_Outlet_Temp) - 3 - $WCS;				-- set SHifT to lower value if outside temperature is high and during first 3 minutes of compressor run to prevent early switch off due to too high To > HRT delta
+			elseif @Compressor_Freq < 21 && max(#RoomTempControl,
+				ceil(@Main_Outlet_Temp - 1.9 - $WCS)) < #SHifT then			-- 2603.11 added this logic to avoid changes is not required
+				print('no #SHifT required');
 			else
-				#SHifT = max(#RoomTempControl,ceil(@Main_Outlet_Temp) - 2 - $WCS);	-- default SHifT to RoomTempControl, which is based on RoomTempDelta and will be calculated in the PID function (see rule on timer=9)
-			end
+				#SHifT = max(#RoomTempControl,ceil(@Main_Outlet_Temp - 1.9 - $WCS));	-- default SHifT to RoomTempControl, which is based on RoomTempDelta and will be calculated in the PID function (see rule on timer=9). Safeguard to make sure Ta is not going >=2 above setpoint.
+			end 
 			if #TaDelta < 2 then								-- safeguard: increase #ShifT if #TaDelta > 2 degrees for too long to prevent compressor switch off
 				#TaDeltaTimer = 0;							-- reset TaDeltaTimer if delta < 2 degrees
 			elseif #TaDeltaTimer == 0 then
+				#TaDeltaTimer = 10;							-- 2603.03 added this line to prevent restarting timer 12 multiple times 
 				setTimer(12,10);							-- start timer=12 to accumulate TaDeltaTimer time
-			elseif #TaDeltaTimer >= 180 then						-- only increase SHifT if TaDeltaTimer > 180 seconds
+			elseif #TaDeltaTimer >= 80 then							-- only increase SHifT if TaDeltaTimer > 80 seconds
 				#SHifT = ceil(@Main_Outlet_Temp - 1.8 - $WCS);				-- calculate required SHifT based on Main Outlet Temp and Weather Compensation Setpoint
+--[[				if #Debug > 0 then
+					print('$WCS: ', $WCS, ' #SHifT: ', #SHifT);
+				end]]
 			end
-			if #TaDelta >= 3 then
+			if #TaDelta >= 3 || ($WCS + #SHifT - @Main_Outlet_Temp >=3) then		-- 2603.04 added ($WCS + #SHifT - @Main_Outlet_Temp >=3) to prevent #TADelta >=3 based on new #ShifT value
 				#SHifT = ceil(@Main_Outlet_Temp) - 2 - $WCS;				-- safeguard: additional check to prevent immediate switch off if #TaDelta is really high
+--[[				if #Debug > 0 then 
+					print('$WCS: ', $WCS, ' #SHifT: ', #SHifT);
+				end]]
 			end
-		elseif (#CompRunMin > (- 2 * #OutsideTemp - 30) || %hour < 7 ||	%hour >22 ||		-- Compressor is not running
-				#RoomTempDelta > 0.2) then						-- compressor is off for a relative short time (depending on outside temperature), SHifT to -5 to avoid short cycle.
+		elseif ((#CompRunMin > (- 2 * #OutsideTemp - 30) && #RoomTempDelta > 0) 		-- Compressor is not running. 2603.04 added && #RoomTempDelta > 0
+				|| %hour < 7 ||	%hour >22 || #RoomTempDelta > 0.2) then			-- compressor is off for a relative short time (depending on outside temperature) and #RoomTempDelta <= 0, SHifT to -5 to avoid short cycle.
 			#SHifT = -5;
 		else
 			#SHifT = 0;									-- default SHifT to 0 if compressor is off for a longer time and room temperature isn't too high
 		end
 		#SHifT = min(max(#SHifT, -5), 5);							-- keep #SHifT in the range -5 to +5
-		$Z1HRT = max($WCS + #SHifT,27);								-- 2601.06c added max ,30 to avoid lower values than 30
+		#Z1HRT = coalesce($WCS, #WCS) + #SHifT;							-- 2603.06 added coalesce to have correct #Z1HRT if #Compressor isn't running
 		if @Z2_Heat_Request_Temp > 25 then							-- override if Z2 request is higher than 25 degrees
-			$Z1HRT = @Z2_Heat_Request_Temp;
+			#Z1HRT = @Z2_Heat_Request_Temp;
 		end
-		if $Z1HRT != @Z1_Heat_Request_Temp then							-- set only when value changed
-			@SetZ1HeatRequestTemperature = $Z1HRT;
+		if #Z1HRT != @Z1_Heat_Request_Temp then							-- set only when value changed
+			@SetZ1HeatRequestTemperature = #Z1HRT;
 		end
 	end
 end
 
 --[[
-**timer=4, OpenThermThermostat + PumpDuty**
+**timer=4, OpenThermThermostat**
 *Purpose*:	to control the HP Heat & Cool prodcution by the Opentherm Thermostat and set max pump duty.
 *Explanation*:	Heating: The main control is ?chEnable; chEnable does have similar function as an ON/OFF thermostat 
 		The HP will be switched ON if #chEnable == 1 and the RoomTemp isn't too high. The HP will be switched OFF if all of the following conditions are true:
@@ -273,43 +244,48 @@ end
 *Called by*:	System#Boot initially, setTimer(4,60) in function itselfs
 rule 08]]
 on timer=4 then
-	setTimer(4,60);											-- run every minute
-	if #Heat && @ThreeWay_Valve_State == 0 && @Defrosting_State == 0 && #DHWRun < 2 then		-- Thermostat function only required during certain conditions
-		$OverNight = %hour > 22 || %hour < 3;
-		$HPOff1Conditions = (#RoomTempDelta > 0.7 && %hour > 9) ||
-			#RoomTempDelta > 1.5 || #chEnableOnMin < -30;					-- conditions mainly based on $RoomTempDelta
-		$HPOff2Conditions = #CompRunMin > 60 || #CompState == 0 || $OverNight;			-- conditions mainly based on #CompState & #CompRunMin
-		$HPOff3Conditions = #OutsideTemp > 4 || (#chEnable == 0 && $OverNight);			-- conditions mainly based on #OutsideTemp
-		$chEnableCondition = #chEnable && #chEnableOnMin > 60 &&
-			#CompRunMin < -60 && $OverNight != 1;						-- 2510.07 added this $chEnableCondition to avoid too long no run if chEnable is on.
-		$HPOnCondition = (((#RoomTempDelta < 0.3 || %hour == 7) && #OutsideTemp < 11) ||	-- 2512.03 added $chEnableCondition && #RoomTempDelta < 2 logic 
-			(#RoomTempDelta < 1 && #OutsideTemp < 2)|| #RoomTempDelta < 0 ||
-			($chEnableCondition && #RoomTempDelta < 2));
-		if #chEnable && $HPOnCondition && #HPStateR != 1 then
-				#HPStateR = 1;								-- Set HP ON (HP State 1) if Heat Request
-		elseif $HPOff1Conditions && $HPOff2Conditions && $HPOff3Conditions &&
-			$chEnableCondition == 0 && #HPStateR != 0 then					-- Conditions to really switch off Heat Pump
-			#HPStateR = 0;									-- Set HP OFF (HP State 0) if no Heat Request anymore
-			if #OMR != 0 && #OMR != 3 then							-- set #OMR = 0 if not 0 or 3. 3 (DHW only) is used only manual
-				#OMR = 0;
+	setTimer(4,60);												-- run every minute, Thermostat function only required during certain conditions 
+	if @Sterilization_State == 0 && #DHWRun < 2 then							-- OpenThermThermostat only possible if no Sterilization and no DHWRun (during DHWRun #DHWRun = 2 or 3)		
+		if #Heat == 1 && @ThreeWay_Valve_State == 0 && @Defrosting_State == 0 then
+			$OverNight = %hour > 22 || %hour < 3;
+			$chEnableCondition = #chEnable && #chEnableOnMin > 60 &&
+				#CompRunMin < -60 && $OverNight != 1;						-- 2510.07 added this $chEnableCondition to avoid too long no run if chEnable is on.
+			if #chEnable == 1 && (((#RoomTempDelta < 0.2 || %hour == 7) && #OutsideTemp < 11) ||	-- 2512.03 added $chEnableCondition && #RoomTempDelta < 2 logic
+				(#RoomTempDelta < 1 && #OutsideTemp < 2)|| #RoomTempDelta < 0 ||
+				($chEnableCondition == 1 && #RoomTempDelta < 2)) && #HPStateR != 1 then
+				#HPStateR = 1;									-- Set HP ON (HP State 1) if Heat Request
+			elseif ((#RoomTempDelta > 0.2 && %hour > 9) ||						-- 2603.01 change RoomTempDelta condition from > 0.7 to > 0.2 to switch off HP earlier.
+				#RoomTempDelta > 1.5 || (#chEnable == 0 && #chEnableOnMin < -30)) &&				-- 2609.01 || #chEnableOnMin < -30 changed to || (#chEnable == 0 && #chEnableOnMin < -30)
+				(#CompRunMin > 60 || #CompState == 0 || $OverNight) && 
+				(#OutsideTemp > 4 || (#chEnable == 0 && $OverNight)) &&
+				$chEnableCondition == 0 && #HPStateR != 0 then					-- Conditions to really switch off Heat Pump
+				#HPStateR = 0;									-- Set HP OFF (HP State 0) if no Heat Request anymore
+				if #OMR != 0 && #OMR != 3 then							-- set #OMR = 0 if not 0 or 3. 3 (DHW only) is used only manual
+					#OMR = 0;
+				end
 			end
+		end		
+		$CoolingEnable = max(round(#CoolingEnable),0);						-- $CoolingEnable is a debounced/filtered value based on ?CoolingEnable, not a direct copy; smoothing avoids reacting to short glitches.
+		if $CoolingEnable == 1 then	 							-- Cooling request, only if no DHWRun (during DHWRun #DHWRun = 2 or 3)
+			#OMR = 1; 									-- set OM to 1 (Cooling)
+			#HPStateR = 1;									-- set Heatpump on
+			$CoolForce = 0;
+			if #CompState == 1 then								-- calculate required temperature during cooling as high as possible to keep the comprossor running _
+				$CoolReqTempMin = min(round(@Main_Outlet_Temp), 19);			-- 	as long as possible.
+			else 
+				$CoolReqTempMin = 0;
+				if @Main_Outlet_Temp > (@Main_Target_Temp + 3) then
+					$CoolForce = -2;
+				end
+			end
+			$CoolingControl = max((?coolingControl + $CoolForce), 12, $CoolReqTempMin);
+			if @Z1_Cool_Request_Temp != $CoolingControl then				-- set @Z1_Cool_Request_Temp based on OT value which is generated by dewpoint calculation in HA
+				@SetZ1CoolRequestTemperature = $CoolingControl;
+			end
+		elseif $CoolingEnable == 0 && #OMR == 1 && #DHWRun < 2 && #CompState == 0 then		-- No Cooling request and OM = Cooling, no DHWRun (during DHWRun #DHWRun = 2 or 3) and compressor off
+			#OMR = 0;									-- set OM back to default (0)
+			#HPStateR = 0;									-- set Heatpump off
 		end
-	end
-	$CoolingEnable = max(round(#CoolingEnable),0);							-- $CoolingEnable will be 1 when cool request
-	if $CoolingEnable && #DHWRun < 2 then 								-- Cooling request, only if no DHWRun (during DHWRun #DHWRun = 2 or 3)
-		#OMR = 1; 										-- set OM to 1 (Cooling)
-		#HPStateR = 1;										-- set Heatpump on
-		if #CompState then									-- calculate required temperature during cooling as high as possible to keep the comprossor running _
-			$CoolReqTempMin = min(round(@Main_Outlet_Temp), 19);				-- 	as long as possible.
-		else 
-			$CoolReqTempMin = 0;
-		end
-		if @Z1_Cool_Request_Temp != ?coolingControl then					-- set @Z1_Cool_Request_Temp based on OT value which is generated by dewpoint calculation in HA
-			@SetZ1CoolRequestTemperature = max(?coolingControl, 12, $CoolReqTempMin);
-		end
-	elseif $CoolingEnable == 0 && #OMR && #DHWRun < 2 && #CompState == 0 then			-- No Cooling request and OM = Cooling, no DHWRun (during DHWRun #DHWRun = 2 or 3) and compressor off
-		#OMR = 0;										-- set OM back to default (0)
-		#HPStateR = 0;										-- set Heatpump off
 	end
 end
 
@@ -325,26 +301,43 @@ end
 rule 09]]
 on timer=5 then
 	setTimer(5,900);										-- run this rule every 15 minutes.
-	if @Defrosting_State == 0 && #dhwEnable then							-- don't run during Defrost or ?dhwEnable isn't true
+	if @Defrosting_State == 0 && ?dhwEnable then							-- don't run during Defrost or ?dhwEnable isn't true
 		$DHWTime = 13;
 		if (%month > 3 || %month < 9) && %hour == 8 && #OutsideTemp > 20 then			-- 2511.14 added $DHWTime to perform DHWRun early morning during Cooling period  
 			$DHWTime = 8;
 		elseif #OutsideTemp < 4 then								-- 2601.02 added logic to do DHWRun early night during very cold weather.
 			$DHWTime = 0;
 		end
-		if @ThreeWay_Valve_State == 0 &&
-			(@DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta - 10) ||			-- DHW run if conditions are right, see above
-			(%hour > 9 && (@DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta - 5)||
-			@DHW_Temp < #DHWTempP -5 )) ||
-			(%hour == $DHWTime && ((%day == #DHWSterilizationDay && @DHW_Temp < 63) ||	-- 2601.01 added @DHW_Temp < 63 check
-			%day == 4 && @DHW_Temp < (@DHW_Target_Temp - 3) ||				-- 2511.10 added temperature check for ComfortDay check
-			@DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta)))) then
+--[[		$DHW10Condition = @DHW_Temp <= (@DHW_Target_Temp + @DHW_Heat_Delta - 10);		-- condition to run DHW immediately if DHW Temp is 10 degrees below default threshold
+		$DHW9hCondition = @DHW_Temp <= (@DHW_Target_Temp + @DHW_Heat_Delta - 5) || 
+					@DHW_Temp < (#DHWTempP - 5);					-- condition to run DHW after 9h if DHW temp is 5 degrees below default threshold or 5 degrees below previous DHW Temp
+		$DHWTimeCondition = (%day == #DHWSterilizationDay && @DHW_Temp < 63) ||			-- 2601.01 added @DHW_Temp < 63 check
+        			(%day == 4 && @DHW_Temp < (@DHW_Target_Temp - 3)) ||			-- 2511.10 added temperature check for ComfortDay check
+        			(@DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta));			-- condition to run DHW at $DHWTime if DHW Temp is below default threshold
+		if @ThreeWay_Valve_State == 0 && (
+			$DHW10Condition ||								-- #DHWRun at any time if @DWH_Temp is 10 degrees below default threshold					
+			(%hour >= 9 && $DHW9hCondition) ||						-- Checks after 9h to prevent DHW run during the night when noise can be an issue
+        		(%hour == $DHWTime && $DHWTimeCondition)
+			) then]]										-- checks if it's $DHWTime
+		if @ThreeWay_Valve_State == 0 && (
+			(@DHW_Temp <= (@DHW_Target_Temp + @DHW_Heat_Delta - 10)) || 
+			(%hour >= 9 && (
+				@DHW_Temp <= (@DHW_Target_Temp + @DHW_Heat_Delta - 5)|| 
+				@DHW_Temp < (#DHWTempP - 5))
+				) || 
+			(%hour == $DHWTime && (
+				(%day == #DHWSterilizationDay && @DHW_Temp < 55) ||			-- 2605.03 changed from < 63 to < 55 degrees
+				(%day == 4 && @DHW_Temp < (@DHW_Target_Temp - 3)) ||
+				(@DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta))
+				)
+			)
+		) then
 			#DHWRun = 2;									-- set #DHWRun to 2 to make sure no rules will interfear during DHW run.
 			#OMP = @Operating_Mode_State;							-- store current OM in #OMP to be able to go back to this OM after the DHW run
 			#HPStateP = @Heatpump_State;							-- store current HPS in #HPStateP to be able to go back to this HPS after the DHW run
 			if #OMP == 0 then								-- set #OMR (Requested OM) depending on current OM
 				#OMR = 4;
-			elseif #OMP then
+			elseif #OMP == 1 then
 				#OMR = 5;
 			else
 				#OMR = 3;
@@ -387,22 +380,29 @@ rule 10]]
 on timer=6 then
 	setTimer(6, 60);										-- run this rule every minute.
 	$MaxPumpDuty = 102 - 4 * @Heat_Delta;								-- default value; Maximum Pumpduty value which fits my installation (~ 11l/m)
-	if @ThreeWay_Valve_State then									-- set value during DHW run
+--	print('1 MPD: ', $MaxPumpDuty);
+	if @ThreeWay_Valve_State == 1 then								-- set value during DHW run
 		$MaxPumpDuty = 140;									-- value during DHW run !!!
+--		print('2 MPD: ', $MaxPumpDuty);
 		if (@Sterilization_State == 0 && @DHW_Temp > @DHW_Target_Temp) ||
-			(@Sterilization_State && @DHW_Temp > 57) then
+			(@Sterilization_State == 1 && @DHW_Temp > 57) then
 			$MaxPumpDuty = $MaxPumpDuty - 10;						-- lower value at the end of the DHW run to recude noise if 3way valve swich back to room
+--			print('3 MPD: ', $MaxPumpDuty);
 		end
-	elseif @Operating_Mode_State then								-- OM Cool, fixed value during Cool!!
+	elseif @Operating_Mode_State == 1 then								-- OM Cool, fixed value during Cool!!
 		$MaxPumpDuty = 92;
-	elseif @Heatpump_State then									-- Set value for non-DHW run and HP state ON.
+--		print('4 MPD: ', $MaxPumpDuty);
+	elseif @Heatpump_State == 1 then								-- Set value for non-DHW run and HP state ON.
 		if @Compressor_Freq == 0 && @Defrosting_State != 1 then					-- this value is used for water cicrulation when compressor is off (between the runs) !!!
-			$MaxPumpDuty = 102 - 4 * @Heat_Delta;
+			$MaxPumpDuty = 112 - 4 * @Heat_Delta;						-- 2605.02 increased to 112 to avoid E62 errors	
+--			print('5 MPD: ', $MaxPumpDuty);
 		else
 			-- $QFH = 10; $QFL = 16; $tH = 11; $tL = -3; 					-- determine target MaxPumpFlow based on outside temperature. factor = (16-10)/(11--3) = 6/14
 			$MaxPumpFlow = min(max(ceil(10 + (11 - #OutsideTemp) * 6 / 14), 10), 16);	-- set value during heat based on req. flow from 10 l/m @ 11 degrees or higher and 14 l/m @ -3 degrees or lower. !!!
+--			print('6 MPD: ', $MaxPumpDuty);
 			if @Pump_Flow > 1 && @Pump_Flow < 8 && $MaxPumpDuty <= @Max_Pump_Duty then	-- increase value to prevent E62 error if waterflow is too low.
 				$MaxPumpDuty = @Max_Pump_Duty + 1;
+--				print('7 MPD: ', $MaxPumpDuty);
 			else
 				$MaxPumpDuty = 55 + floor($MaxPumpFlow * 3);
 				if (@Pump_Speed / @Pump_Flow) > 145 then
@@ -412,9 +412,11 @@ on timer=6 then
 						$MaxPumpDuty = @Max_Pump_Duty;
 					end
 				end
+--				print('8 MPD: ', $MaxPumpDuty);
 			end
 		end
 	end
+--	print('9 MPD: ', $MaxPumpDuty);
 	$MaxPumpDuty = max($MaxPumpDuty, 82);								-- prevent lower values than 82 !!!
 	if @Max_Pump_Duty != $MaxPumpDuty then								-- set only when value changed
 		@SetMaxPumpDuty = $MaxPumpDuty;
@@ -433,7 +435,7 @@ on timer=7 then
 	setTimer(7,120);
 --	$CFH = 24;	$CFL = 54;	$tH = 6;	$tL = -3;				-- Determine target frequency based on outside temperature. factor = (54-24)/(6--3) = 30/9
 	#CompFreqTarget = min(max(ceil(24 + (6 - #OutsideTemp) * 30 / 9), 24), 54);
-	if @Defrosting_State || #CompState < 1 || #CompRunMin < 5 || %hour < 7 ||		-- 2601.06 changed #CompRunMin from <10 to < 5
+	if @Defrosting_State == 1 || #CompState < 1 || #CompRunMin < 5 || %hour < 7 ||		-- 2601.06 changed #CompRunMin from <10 to < 5
 		@Operating_Mode_State == 1 then							-- Safety/exclusion conditions, always #QMR = 3
 		#QMR = 3;
 	elseif @Compressor_Freq < #CompFreqTarget || (#QMR == 0 &&
@@ -476,27 +478,35 @@ on timer=8 then
 	?outsideTemp = round(#OutsideTemp);								-- sync OpenTherm value with HP value
 	?dhwTemp = round(@DHW_Temp);									-- sync OpenTherm value with HP value
 	?dhwSetpoint = @DHW_Target_Temp;								-- sync OpenTherm value with HP value
-	#dhwEnable = ?dhwEnable;									-- sync with OpenTherm value
 	#CoolingEnable = #CoolingEnable + 0.1 * (?CoolingEnable - #CoolingEnable);			-- avoid #CoolingEnable to react on short error ?CoolingEnable
-	if ?chEnable then
-		if #chEnable == 0 then
-			#chEnableChangeTime = #Time;							-- set #chEnableChangeTime if #chEnable changes 
-		end
+	#RoomSetpoint = min(max(?roomTempSet, 10), 22);
+	if ?maxRelativeModulation != 100 then								-- using MM to communicate current room temp. replace with #RoomTemp = ?roomTemp if your thermostat is providing a good, stable value.
+		#RoomTemp = 15 + ?maxRelativeModulation / 10;
+	else
+		#RoomTemp = #RoomSetpoint;
+	end
+	#RoomTempDelta = #RoomTemp - #RoomSetpoint;
+	if ?chEnable == 1 then
 		#chEnableTimeOff = -1;
-		#chEnable = 1;
+		if #chEnable == 0 && #RoomTemp != 15 then						-- 2605.01 safeguard: prevent transition #chEnable 0 -> 1 if #RoomTemp is 15, which means Evohome is OFF and no valid room temperature is provided via ?maxRelativeModulation
+			#chEnableChangeTime = #Time;							-- set #chEnableChangeTime if #chEnable changes
+			#chEnable = 1;
+		end
 	else
 		if #chEnableTimeOff < 0 then								-- set #chEnableTimeOff if ?chEnable has changed to 0
 			#chEnableTimeOff = #Time;
 		end
-		if  #Time - #chEnableTimeOff > 15 && #chEnable then
+		$chEnableOffElapsed = (#Time - #chEnableTimeOff + 10080) % 10080;			-- elapsed time with week wrap correction
+		if $chEnableOffElapsed > 15 && #chEnable == 1 then
 			#chEnable = 0;
-			#chEnableChangeTime = #Time;							-- set #chEnableChangeTime if #chEnable changes 
-		end											-- Evohome sometimes set chEnable off for 5 minutes
+			#chEnableChangeTime = #Time;							-- set #chEnableChangeTime if #chEnable changes
+		end											-- Evohome sometimes sets chEnable off for 5 minutes
 	end
-	if #chEnable then
-		#chEnableOnMin= #Time - #chEnableChangeTime;
+	$chEnableElapsed = (#Time - #chEnableChangeTime + 10080) % 10080;
+	if #chEnable == 1 then
+		#chEnableOnMin = $chEnableElapsed;
 	else
-		#chEnableOnMin= #chEnableChangeTime - #Time;
+		#chEnableOnMin = 0 - $chEnableElapsed;
 	end
 	?maxTSet = #WCS + 5;										-- Highest temperature OT Thermostat can request.
 	?relativeModulation = round(@Compressor_Current / 15 * 100);					-- communicate an estimated modulation % via OT based on @Compressor_Current (max 15A)
@@ -514,7 +524,7 @@ on timer=8 then
 		end
 		if @Cool_Power_Consumption > 0 then
 			?coolingState = 1;
-		else	
+		else
 			?coolingState = 0;
 		end
 	else
@@ -523,13 +533,6 @@ on timer=8 then
 		?dhwState = 0;
 		?coolingState = 0;
 	end
-	#RoomSetpoint = min(max(?roomTempSet, 10), 22);
-	if ?maxRelativeModulation != 100 then								-- using MM to communicate current room temp. replace with #RoomTemp = ?roomTemp if your thermostat is providing a good, stable value.
-		#RoomTemp = 15 + ?maxRelativeModulation / 10;
-	else
-		#RoomTemp = #RoomSetpoint;
-	end
-	#RoomTempDelta = #RoomTemp - #RoomSetpoint;
 	#OutsideTemp = (#OutsideTemp * 59 + @Outside_Temp)/60;						-- OusideTemp is taken every 30 minutes to keep it stable
 	if @Operating_Mode_State != #OMR then								-- Sync OM with #OMR
 		@SetOperationMode = #OMR;
@@ -581,16 +584,16 @@ end
 		to the rooms). The reason for not using the compensation curve from the HP is now #WCS is only calculated every 30 minutes and the TaShift function doesn't
 		cause an unwanted Compressor switch off. Most values for the calculation ($Ta1 = @Z1_Heat_Curve_Target_Low_Temp, $Tb1 = @Z1_Heat_Curve_Outside_High_Temp and 
 		$Tb2 = @Z1_Heat_Curve_Outside_Low_Temp are from Heat pump settings, $Ta2 must be set in rules as @Z1_Heat_Curve_Target_High_Temp will be set to calculated value in direct mode.
-		2512.08: $Ta2 changed from 34 to 36.
+		2512.08: $Ta2 changed from 34 to 36. Default values: 5 ⁰C: 30 ⁰C, -5 ⁰C: 36 ⁰C.
 *Result*:	#WCS, Weather Compensation Setpoint
 *Called by*:	system#boot initially, setTimer(10,1800) in function itselfs
 rule 14]]
 on timer=10 then
 	setTimer(10,1800);											-- run this rule every half hour
---	$Ta1 = @Z1_Heat_Curve_Target_Low_Temp; $Tb1 = @Z1_Heat_Curve_Outside_High_Temp;$Tb2 = @Z1_Heat_Curve_Outside_Low_Temp;
-	$Ta2 = 36;												-- $Ta2 must be set in rules as @Z1_Heat_Curve_Target_High_Temp will be set to calculated value
+--	$Ta1 = @Z1_Heat_Curve_Target_Low_Temp; $Tb1 = @Z1_Heat_Curve_Outside_High_Temp;$Tb2 = @Z1_Heat_Curve_Outside_Low_Temp; $Ta2 = 36;
+-- $Ta2 must be set in rules as @Z1_Heat_Curve_Target_High_Temp will be set to calculated value
 	#WCS = min(max(ceil(@Z1_Heat_Curve_Target_Low_Temp + (@Z1_Heat_Curve_Outside_High_Temp - #OutsideTemp)
-		* ($Ta2 - @Z1_Heat_Curve_Target_Low_Temp) / (@Z1_Heat_Curve_Outside_High_Temp - @Z1_Heat_Curve_Outside_Low_Temp)),@Z1_Heat_Curve_Target_Low_Temp), $Ta2);
+		* (36 - @Z1_Heat_Curve_Target_Low_Temp) / (@Z1_Heat_Curve_Outside_High_Temp - @Z1_Heat_Curve_Outside_Low_Temp)),@Z1_Heat_Curve_Target_Low_Temp), 36);
 end
 
 --[[
@@ -608,16 +611,15 @@ on timer=11 then
 end
 
 --[[
-**timer=12, CompRunSec timer**
+**timer=12, TaDeltaTimer timer**
 *Purpose*:	10 second timer to increase #TaDeltaTimer if #TaDelta is >= 2 degrees during compressor run, this to prevent early switch off of compressor due to high #TaDelta during first minutes of compressor run when #SHifT is still low.
 *Explanation*: 
 *Result*:	#TaDeltaTimer
 *Called by*:	TaShift
 rule 16]]
 on timer=12 then
-	$t12Timer = 10;											-- run every 10 seconds
 	if #TaDeltaTimer < 200 && #TaDelta >= 2 then
-		#TaDeltaTimer = #TaDeltaTimer + $t12Timer;
-		setTimer(12,$t12Timer);
+		#TaDeltaTimer = #TaDeltaTimer + 10;
+		setTimer(12, 10);
 	end
 end
