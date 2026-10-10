@@ -2,9 +2,9 @@
 
 These are the rules I use to control a Panasonic heat pump with an OpenTherm thermostat. They are tailored to my installation; use them as inspiration and adapt the settings and integration to your own system.
 
-## Current version: 2609.02
+## Current version: 2610.01
 
-See [CHANGELOG.md](CHANGELOG.md) for all changes since the previous published version, 2602.22d.
+See [CHANGELOG.md](CHANGELOG.md) for the changes in each published version; the latest release is compared with 2609.02.
 
 | File | Purpose |
 | --- | --- |
@@ -48,7 +48,9 @@ The `.lua` extension is a filename convention: these files use the **HeishaMon r
 
 1. Save a copy of your existing rules and check the settings and integration above.
 2. Load the contents of `HeishaMon_Rules_BlB4.lua` into the HeishaMon rules editor, without Markdown fences.
-3. Check the boot log for `BLB Heishamon_rules_2609.02.lua` and monitor operation in your installation.
+3. Check the boot log for `BLB Heishamon_rules_2610.01.lua` and monitor operation in your installation.
+
+Timer 1 adopts the current heat-pump operating mode as `#OMR` 10 seconds after boot. Timer 8 then enforces that requested mode every 30 seconds. This release prevents DHW start re-entry but does not automatically repair a DHW-only mode adopted during initialisation. To recover, stop rules execution, select the intended mode (for example HEAT), then restart the rules and check the log.
 
 For edits, work in `HeishaMon_Rules_BlB4_commented.lua`, then generate the ready-to-load file using the [HeishaMon rules minifier](https://github.com/klaashoekstra94/heishamon_rules_minify). Keep both files in sync.
 
@@ -57,3 +59,4 @@ For edits, work in `HeishaMon_Rules_BlB4_commented.lua`, then generate the ready
 Thanks to [HeishaMon](https://github.com/Egyras/HeishaMon), [@CurlyMoo](https://github.com/CurlyMoo) for the rules functionality and [@fbloemhof](https://github.com/fbloemhof) for the documentation inspiration.
 
 Licensed under the [MIT License](LICENSE).
+
