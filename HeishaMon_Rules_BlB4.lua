@@ -1,5 +1,5 @@
 on System#Boot then
-	print('BLB Heishamon_rules_2609.02.lua');
+	print('BLB Heishamon_rules_2610.01.lua');
 	#chEnableOnMin = -1;
 	#chEnableChangeTime = -1;
 	#chEnableTimeOff = -1;
@@ -187,10 +187,10 @@ on timer=5 then
 		elseif #OutsideTemp < 4 then
 			$DHWTime = 0;
 		end
-		if @ThreeWay_Valve_State == 0 && ((@DHW_Temp <= (@DHW_Target_Temp + @DHW_Heat_Delta - 10))|| 
+		if #DHWRun < 1 && @ThreeWay_Valve_State == 0 && ((@DHW_Temp <= (@DHW_Target_Temp + @DHW_Heat_Delta - 10))|| 
 			(%hour >= 9 && (@DHW_Temp <= (@DHW_Target_Temp + @DHW_Heat_Delta - 5)|| 
 				@DHW_Temp < (#DHWTempP - 5)))|| 
-			(%hour == $DHWTime && ((%day == #DHWSterilizationDay && @DHW_Temp < 55) || (%day == 4 && @DHW_Temp < (@DHW_Target_Temp - 3)) || (@DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta))))) then
+			(%hour == $DHWTime && ((%day == #DHWSterilizationDay && @DHW_Temp < 50) || (%day == 4 && @DHW_Temp < (@DHW_Target_Temp - 3)) || (@DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta))))) then
 			#DHWRun = 2;
 			#OMP = @Operating_Mode_State;
 			#HPStateP = @Heatpump_State;
