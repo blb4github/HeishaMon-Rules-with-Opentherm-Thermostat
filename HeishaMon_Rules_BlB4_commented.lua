@@ -4,8 +4,8 @@
 This is my ruleset I use on my HeishaMon to control my Panasonic Heat Pump in combination with an Opentherm thermostat. I try to keep it as univeral as possible but it is at the end 
 taylored to my situation and needs. You can just copy it and start using it (at your own risk) or, better, you can use is as inspiration for your own rules set.
 
-Release 2609.02
-Consolidated changes since published version 2602.22d.
+Release 2610.01
+Changes since published version 2609.02.
 See CHANGELOG.md for the release notes; intermediate local versions are omitted.
 
 **My environment:**
@@ -50,7 +50,7 @@ e) Settings Heat Pump: Heating_Mode: 1 (direct), Cooling_Mode: 1 (direct), Buffe
 *Called by*:	system Boot
 rule 01]]
 on System#Boot then
-	print('BLB Heishamon_rules_2609.02.lua');
+	print('BLB Heishamon_rules_2610.01.lua');
 	#chEnableOnMin = -1;			-- Duration (in Minutes) chEnable on (positive) or off (negative)
 	#chEnableChangeTime = -1;		-- Time #chEnable changes
 	#chEnableTimeOff = -1;			-- Time ?chEnable goes off (0)
@@ -293,8 +293,8 @@ end
 **timer=5, DHW**
 *Purpose*:	1) to have hot water available & 2) to do weekly sterilization run.
 *Explanation*:	DHW run will be done: 1) every day after 13h (most efficient time of the day) if DHW temp is below default threshold (@DHW_Heat_Delta), 2) if %day = #DWHComfortDay, 3) after 9h if DHW temp is
-		5 degrees below default threshold or 5 degrees below previous DHW Temp and 4) immediately if DHW Temp is 10 degrees below default threshold. If day is #DHWSterilizationDay a DHW run + sterilization run will always be performed,
-		also if default threshold is not passed. if day is #DHWComfortDay a DRH run will always be performed. If a DHW run is performed after 11h on the day before #DHWSterilizationDay the sterilization run
+		5 degrees below default threshold or 5 degrees below previous DHW Temp and 4) immediately if DHW Temp is 10 degrees below default threshold. If day is #DHWSterilizationDay and DHW Temp < 50 a DHW run + sterilization run will be performed.
+		If day is #DHWComfortDay a DRH run will always be performed. If a DHW run is performed after 11h on the day before #DHWSterilizationDay the sterilization run
 		will be perfored on this day and the Sterilization run will be skiped on SterilizationDay itself. OM 4 is used to give the HP the option to produce heat during Sterilization run on external element.
 		After the DHW run the previous OM and HPState will be restored. Defrost state is checked to prevent returning back from DHW run to previous OM if Defrost is performed during DHW run.
 *Called by*:	system#boot initially, setTimer(5,900) in function itselfs
@@ -319,18 +319,17 @@ on timer=5 then
 			(%hour >= 9 && $DHW9hCondition) ||						-- Checks after 9h to prevent DHW run during the night when noise can be an issue
         		(%hour == $DHWTime && $DHWTimeCondition)
 			) then]]										-- checks if it's $DHWTime
-		if @ThreeWay_Valve_State == 0 && (
+		if #DHWRun < 1 && @ThreeWay_Valve_State == 0 && (
 			(@DHW_Temp <= (@DHW_Target_Temp + @DHW_Heat_Delta - 10)) || 
 			(%hour >= 9 && (
-				@DHW_Temp <= (@DHW_Target_Temp + @DHW_Heat_Delta - 5)|| 
+				@DHW_Temp <= (@DHW_Target_Temp + @DHW_Heat_Delta - 5) || 
 				@DHW_Temp < (#DHWTempP - 5))
-				) || 
+			) || 
 			(%hour == $DHWTime && (
-				(%day == #DHWSterilizationDay && @DHW_Temp < 55) ||			-- 2605.03 changed from < 63 to < 55 degrees
+				(%day == #DHWSterilizationDay && @DHW_Temp < 50) ||			-- 2610.01 changed from < 55 to < 50 degrees
 				(%day == 4 && @DHW_Temp < (@DHW_Target_Temp - 3)) ||
 				(@DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta))
-				)
-			)
+			))
 		) then
 			#DHWRun = 2;									-- set #DHWRun to 2 to make sure no rules will interfear during DHW run.
 			#OMP = @Operating_Mode_State;							-- store current OM in #OMP to be able to go back to this OM after the DHW run
