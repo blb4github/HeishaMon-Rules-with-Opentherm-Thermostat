@@ -1,5 +1,24 @@
 # Changelog
 
+## 2610.01 — 2026-10-10
+
+Changes since published version **2609.02**.
+
+### Domestic hot water
+
+- Require `#DHWRun < 1` before starting a rules-controlled DHW run. Active, finishing and boot-detected runs cannot re-enter the start branch and overwrite the saved previous operating mode (`#OMP`) or heat-pump state (`#HPStateP`).
+- Lower the scheduled sterilisation-day DHW-start threshold from below 55 °C to below 50 °C. At 50 °C or above, that specific scheduled trigger does not request a run. This changes the start trigger, not the sterilisation target temperature; other DHW triggers and the existing sterilisation logic during a DHW run remain unchanged.
+- Update the boot version string and DHW explanation in both rules files.
+
+### Loading and recovery
+
+- Document that timer 1 still adopts the current operating mode 10 seconds after boot, and timer 8 enforces `#OMR` every 30 seconds. A previously adopted DHW-only mode is not automatically corrected by this release; initialise the rules with the intended operating mode when recovering from this state.
+
+### Validation
+
+- Confirmed that the commented source and ready-to-load rules contain identical executable content after comments and whitespace are removed.
+- Reviewed changes against published 2609.02. Heat-pump runtime behaviour after recovery remains to be verified in the installation.
+
 ## 2609.02
 
 Consolidated changes since the previously published GitHub version **2602.22d**. Intermediate local versions are intentionally omitted.
@@ -42,3 +61,4 @@ Consolidated changes since the previously published GitHub version **2602.22d**.
 - Provide the ready-to-load rules as `HeishaMon_Rules_BlB4.lua` and the documented source as `HeishaMon_Rules_BlB4_commented.lua`.
 - Replace the obsolete `.md`/`.txt` rules files and update installation, firmware and Home Assistant integration notes.
 - Remove the stale README reference to ExternalOverride; its removal predates this release.
+
