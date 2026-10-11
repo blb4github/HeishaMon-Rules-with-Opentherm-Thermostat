@@ -1,5 +1,28 @@
 # Changelog
 
+## 2610.03 — 2026-10-11
+
+Changes since published version **2610.01**. Intermediate local version 2610.02 is intentionally included in this release rather than documented as a separate published release.
+
+### Heating startup
+
+- Improve the compressor startup cycle to avoid the previous target-temperature jump from approximately 25 °C to 30 °C during ramp-up.
+
+### OpenTherm room temperature
+
+- Use `?roomTemp` directly as the current room temperature instead of decoding a temperature from `?maxRelativeModulation`.
+- Use the OpenTherm Gateway `RT=<temperature>` command, introduced in OTGW firmware 6.7, to provide Room Temperature as OpenTherm Data-ID 24.
+- Keep `?roomTempSet` as the room setpoint; in this setup Home Assistant supplies it to the OTGW with `BS=<temperature>` (OpenTherm Data-ID 16).
+- Remove the former `maxRelativeModulation` room-temperature encoding, including the fallback in which a value of 100 used the room setpoint.
+- Remove the special `#RoomTemp != 15` condition that blocked a new `chEnable` activation. A room temperature of 15 °C is no longer used as a transport sentinel and can again be treated as a normal temperature.
+- `chEnable` remains the heating-demand signal and retains the existing filtering of short off periods.
+
+### Documentation
+
+- Update the environment and integration notes for the new `RT=` / `?roomTemp` path.
+- Document the OTGW firmware 6.7 requirement for `RT=` and the use of `AA=24` when Data-ID 24 must be injected as an alternative Data-ID.
+- Update the boot version string and README to 2610.03.
+
 ## 2610.01 — 2026-10-10
 
 Changes since published version **2609.02**.
