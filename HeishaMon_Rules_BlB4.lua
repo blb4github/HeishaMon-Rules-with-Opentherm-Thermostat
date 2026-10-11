@@ -1,5 +1,5 @@
 on System#Boot then
-	print('BLB Heishamon_rules_2610.01.lua');
+	print('BLB Heishamon_rules_2610.03.lua');
 	#chEnableOnMin = -1;
 	#chEnableChangeTime = -1;
 	#chEnableTimeOff = -1;
@@ -40,7 +40,7 @@ on timer=1 then
 	#OutsideTemp = @Outside_Temp;
 	#RoomSetpoint = min(max(?roomTempSet, 10), 22);
 	#RoomSetpointP = #RoomSetpoint;
-	#RoomTemp = 15 + ?maxRelativeModulation / 10;
+	#RoomTemp = ?roomTemp;
 	#WCS = @Z1_Heat_Request_Temp;
 	if @Compressor_Freq > 18 then
 		#CompState = 2;
@@ -118,9 +118,8 @@ on TaShift then
 				#SHifT = ceil(@Main_Outlet_Temp - 1.8 - $WCS);
 
 			end
-			if #TaDelta >= 3 || ($WCS + #SHifT - @Main_Outlet_Temp >= 3) then
+			if #TaDelta >= 3 then
 				#SHifT = ceil(@Main_Outlet_Temp) - 2 - $WCS;
-
 			end
 		elseif ((#CompRunMin > (-2 * #OutsideTemp - 30) && #RoomTempDelta > 0) || %hour < 7 || %hour > 22 || #RoomTempDelta > 0.2) then
 			#SHifT = -5;
@@ -129,6 +128,9 @@ on TaShift then
 		end
 		#SHifT = min(max(#SHifT, -5), 5);
 		#Z1HRT = coalesce($WCS, #WCS) + #SHifT;
+		if #CompState > 0 then
+			#Z1HRT = min(#Z1HRT, max($WCS - 5, ceil(@Main_Outlet_Temp) - 1));
+		end
 		if @Z2_Heat_Request_Temp > 25 then
 			#Z1HRT = @Z2_Heat_Request_Temp;
 		end
@@ -293,15 +295,11 @@ on timer=8 then
 	?dhwSetpoint = @DHW_Target_Temp;
 	#CoolingEnable = #CoolingEnable + 0.1 * (?CoolingEnable - #CoolingEnable);
 	#RoomSetpoint = min(max(?roomTempSet, 10), 22);
-	if ?maxRelativeModulation != 100 then
-		#RoomTemp = 15 + ?maxRelativeModulation / 10;
-	else
-		#RoomTemp = #RoomSetpoint;
-	end
+	#RoomTemp = ?roomTemp;
 	#RoomTempDelta = #RoomTemp - #RoomSetpoint;
 	if ?chEnable == 1 then
 		#chEnableTimeOff = -1;
-		if #chEnable == 0 && #RoomTemp != 15 then
+		if #chEnable == 0 then
 			#chEnableChangeTime = #Time;
 			#chEnable = 1;
 		end
