@@ -4,16 +4,79 @@
 This is my ruleset I use on my HeishaMon to control my Panasonic Heat Pump in combination with an Opentherm thermostat. I try to keep it as univeral as possible but it is at the end 
 taylored to my situation and needs. You can just copy it and start using it (at your own risk) or, better, you can use is as inspiration for your own rules set.
 
-Release 2610.01
-Changes since published version 2609.02.
-See CHANGELOG.md for the release notes; intermediate local versions are omitted.
+Release
+20241215	improved OpenThermThermostat to prevent switching off HP early morning as #RoomSetpoint will be increased around 09:00u
+20241216	changed OpenThermThermostat to turn on HP when RTD < 0.2 (before < 0.3)
+20241217	replaced rule on HeatPumpState by syncHP
+20241229	additional rule in OTT to switch on HP if outside temperature is low
+20250103	call DHW and QuietMode only if @Defrosting_State == 0, call TaSHifT and OTT only if @ThreeWay_Valve_State && @Defrosting_State == 0
+20250104	Fixed (and simplified) locig on OTT to avoid overlapping conditions
+20250104	start PID logic for TaSHifT
+20250120	added new TaSHifT logic for outsideTemp < 5 to improve logic during defrost mania
+20250120	simplified conditions == 1 by removing these == 1 where possible 
+20250122	corrected QuietMode with introduction of $QMDHW
+20250128	added check to modify RoomTemp only if value isn't 20 (due to OT problem)
+20250129	modified logic TaSHifT to add #RoomTempControl to #SHifT earlier than after 20 minutes runtime if possible
+20250206	changed to direct heat_mode and compensation curve calculations within the rules set, avoiding compressor switch off due to uncontrolled Target shift.
+20250215	added ?dhwEnable condition to DHW function to control DHW on/of as well with ?dhwEnable
+20250707	added logic to switch to cooling
+20251005	1) removed @Force_DHW_State logic, 2) simplified TaShift logic (less code), 3) moved Cooling logic from sync OpenTherm & Heatpump rule to OpenThermThermostat rule
+2510.03		1) new version numbering (YYMM.XX) where XX is from 00 to 99, 2) PID function only running if no DHWRun
+2510.06		changed logic for chEnableOffTime to be able to use as well the duration chEnable is on
+2510.18		1) added @Main_Outlet_Temp logic to increase setpoint if MOT > HRT + 3, 2) reduced lines by removing #chEnable and #PIDKx variables from System#Boot,
+		3) changed #chEnableOffTime to #chEnableOnMin with improved logic
+2510.33		1) removed all #ExternalOverRide logic to reduce code due to HeishaMon rules errors
+2511.15		1) added #CompRunMin = 0 to @Compressor_Freq logic, 2) added $DHWTime logic to do DHW run early morning during Hot days, 3) Improved ?maxTSet logic
+2511.16		added more explenation about all rules
+2511.17		added $WCS funtion to be able to override to a higher HRT based on @Z2_Heat_Request_Temp
+2511.19		Corrected reset of #PIDIntegral in PID function
+2511.23		1) changed #chEnableOnTime to #chEnableOnMin and #CompRunTime to #CompRunMin for clarity, 
+		2) added #chEnableChangeTime	= #Time; to t2 (initiate variables) to have correct duration for #chEnableOnMin after boot.
+2512.01		1) disabled cooling to have less lines (rules set too long), 2) $PIDKp changed from 2 to 3 in PID function
+2512.03		added && #RoomTempDelta < 2 to $HPOnCondition in OpenThermThermostat to avoid run if during night the roomtemp is way too high, despite chenable on due to other rooms heat request.
+2512.05		Added DHWRun condition; DHW Temp 5 degrees below previous DHW Temp.
+2512.08		Changed #Shift manipulation options: default: 20, 15..25: -5..+5 shift, >25:direct temperature
+2601.01		2601.01 added @DHW_Temp < 63 check to DHW function
+2601.02		1) $MaxPumpDuty more variable, based on @Heat_Delta & @Cool_Delta in PumpDuty function, 2) added DHWTime = 0 during very cold weather in DHW fuction
+2601.03		added #QMR override via @Buffer_Tank_Delta, if above 4 normal operation, otherwise #QMR = @Buffer_Tank_Delta
+2601.06		1) Corrected #Quietmode to get #QMR 3 during @Defrost, added max( ,xx) to TaSHifT
+2601.08		Changed 47 to 47 degrees in DHW function as Sterilisation was often activated after OM was changed back to Heat only.
+2602.01		DHW logic a bit changed.
+2602.03		reduced code size: adjusted chEnableCondition to depend on compressor off > 60 min; simplified PumpDuty flow calc (original constants kept in comment), and PID math
+2602.06		reduced code size: DHWTime default+override; comp freq target via clamped formula
+2602.07		reduced code size: set QMDHW default then override on DHW daytime condition
+2602.16		Complete rewrite of TaSHifT logic to make it more simple and effective, with less code and better handling of TaDelta by introducing #TaDeltaTimer which is increased every 15s
+		if TaDelta > 2 degrees and reset to 0 if TaDelta < 2 degrees, and using #TaDeltaTimer in the TaShift logic to increase shift if TaDelta is > 2 degrees for more than 200s.
+2602.17		1) added logic to set lower timer value during first 3 minutes of compressor run to prevent early switch off due to too high To > HRT delta,
+		2) added @Main_Outlet_Temp trigger to prevent Compressor switch off at the start of the run due to too high temperature delta.
+2602.19		1) simplified weather compensation curve calculation by using direct formula, in timer=6, timer=7 and timer=10. 
+		2) corrected if #CompState == 1 to if #CompState > 0 in TaShift to prevent issues with #CompState = 2 during boot when compressor is already running.
+2602.22		Since new firmware (V4 alpha) the rules set can be longer!! as a result all commented lines related to cooling enabled and working now! Also some other
+	 	commented lines uncoommented to have more functionality. This version is build from 2602.19, check .20 and .21 for other changes which are not in 2602.22.
+2602.24		TaDeltaTimer threshold in TaShift lowered to 120s
+2603.02		Added $TDH variable in Timer=4 (OTT) for OFF and ON conditions
+2603.04		TaShift: added safeguard ($WCS + #SHifT - @Main_Outlet_Temp >=3) to prevent too low target (>=3 above MOT) to prevent direct compressor switch off.
+2603.05		changed #TaDeltaTimer >= 120 to #TaDeltaTimer >= 80 in TaShift
+2603.08		Minor tweaks to DHW (timer=4) to heat up Tank a little bit earlier (changed 3 x < to <=)
+2603.09		TaShift: Safeguard changed from Ta is not going >2 above setpoint to not going >=2 above setpoint.
+2603.10		minimized the number of variables as the total number of variables is limited (seems 127)
+2604.01		fixed $t3Timer in timer=3 to make sure $t3Timer = 15 if #TaDeltaTimer is running
+2605.01		added logic for #chEnable to prevent switching on HP when ?chEnable is on due to OT(GW) problems.
+2605.02		1) increased MaxPumpDuty to 112 to prevent E62 errors.
+2605.03		changed DHW changed from < 63 to < 55 degrees
+2606.02		OTT, Tweaked cooling operatation to switch on compressor earlier and to slow down the compressor earlier as well.
+2609.02		Fix for weekly #Time rotation.
+2610.01		1) Skip weekly Sterilization run if DHW temperature is already >= 50°C,
+           	2) Prevent DHW start logic from re-entering during an active/finishing DHW run, avoiding overwrite of #OMP.
+2610.02		Improved startup cycle without jump from 25 to 30 degrees
+2610.03		Simplified room temperature handling: since OTGW firmware 6.7, RT can provide Room Temperature directly via OpenTherm ID 24.
 
 **My environment:**
 a) Panasonic WH-MDC07J3E5 Heat Pump used for heating, Cooling and DHW (external tank);
 b) HeishaMon Large with firmware version Alpha-f7ae839/Alpha-d8af83f 4.0 with CZ-TAW1 on proxy port (required for warranty, I don't use this CZ-TAW1 actively);
 c) Honeywell Evohome Opentherm Thermostat (R8810 bridge) connected via OpenTherm Gateway;
-d) Honeywell Evohome & OpenTherm Gateway integration in Home Assistant to communicate several parameters  to HeishaMon like RoomTemperatureDelta as chSetpoint from Evohome is not reliable, target room 
-   temperature and current room temperature are not communicated towards 'boiler';
+d) Honeywell Evohome & OpenTherm Gateway integration in Home Assistant to communicate several parameters to HeishaMon like ?roomTemp and ?roomTempSet as chSetpoint from Evohome is not usable in combination
+   with a Heat Pump;
 e) Settings Heat Pump: Heating_Mode: 1 (direct), Cooling_Mode: 1 (direct), Buffer_Installed: 0, DHW_Installed: 1, Pump_Flowrate_Mode: 0, Optional_PCB: 0, Z1_Sensor_Settings: 0
 
 **My Requirements for the Rules Set:**
@@ -28,8 +91,8 @@ e) Settings Heat Pump: Heating_Mode: 1 (direct), Cooling_Mode: 1 (direct), Buffe
 ** rules:**
 01) System#Boot			initiate ruleset 
 02) @Compressor_Freq		set a number of variables & timers based on start or stop compressor
-03) t2  time(r) reference	main compressor run timer (#CompRunMin)
-04) t1  initiate variables	initial values direct after boot which can't be done in System#Boot because @heatpump and ?OpenTherm variables are not yet set at system boot
+03) t1  time(r) reference	main compressor run timer (#CompRunMin)
+04) t2  initiate variables	initial values direct after boot which can't be done in System#Boot because @heatpump and ?OpenTherm variables are not yet set at system boot
 05) @Main_Outlet_Temp		logic to increase setpoint if MOT > HRT + 3 to prevent immediate compressor switch off
 06) t3  TaSHifT			optimize HRT for a) comfort, b) effectiveness and c) long runs. see also t7, t9 and t10
 07) t4  OpenThermThermostat	control HP Heat & Cool prodcution by the Opentherm Thermostat
@@ -50,7 +113,7 @@ e) Settings Heat Pump: Heating_Mode: 1 (direct), Cooling_Mode: 1 (direct), Buffe
 *Called by*:	system Boot
 rule 01]]
 on System#Boot then
-	print('BLB Heishamon_rules_2610.01.lua');
+	print('BLB Heishamon_rules_2610.03.lua');
 	#chEnableOnMin = -1;			-- Duration (in Minutes) chEnable on (positive) or off (negative)
 	#chEnableChangeTime = -1;		-- Time #chEnable changes
 	#chEnableTimeOff = -1;			-- Time ?chEnable goes off (0)
@@ -97,7 +160,7 @@ on timer=1 then
 	#OutsideTemp = @Outside_Temp;									-- set OusideTemp
 	#RoomSetpoint = min(max(?roomTempSet, 10), 22);							-- Room Setpoint
 	#RoomSetpointP = #RoomSetpoint;									-- Previous Room Setpoint
-	#RoomTemp = 15 + ?maxRelativeModulation / 10;							-- Room Temperature. if ?MaxRelativeModulation is 0, RoomTemp will be 15 degrees which means the Heating is off.
+	#RoomTemp = ?roomTemp;										-- Room Temperature. 2610.03 changed to use ?roomTemp
 	#WCS = @Z1_Heat_Request_Temp;									-- set initial Weather Compensation Setpoint to current @Z1_Heat_Request_Temp
 	if @Compressor_Freq > 18 then									-- set #CompState & #CompRunSec to values to indicate compressor is running during first boot
 		#CompState  = 2;									-- Compressor running state (0/1, 2 if already running during rules boot)
@@ -210,11 +273,8 @@ on TaShift then
 					print('$WCS: ', $WCS, ' #SHifT: ', #SHifT);
 				end]]
 			end
-			if #TaDelta >= 3 || ($WCS + #SHifT - @Main_Outlet_Temp >=3) then		-- 2603.04 added ($WCS + #SHifT - @Main_Outlet_Temp >=3) to prevent #TADelta >=3 based on new #ShifT value
-				#SHifT = ceil(@Main_Outlet_Temp) - 2 - $WCS;				-- safeguard: additional check to prevent immediate switch off if #TaDelta is really high
---[[				if #Debug > 0 then 
-					print('$WCS: ', $WCS, ' #SHifT: ', #SHifT);
-				end]]
+			if #TaDelta >= 3 then								-- 2610.02 taken out ($WCS + #SHifT - @Main_Outlet_Temp >=3) again to improve start up logic
+				#SHifT = ceil(@Main_Outlet_Temp) - 2 - $WCS;
 			end
 		elseif ((#CompRunMin > (- 2 * #OutsideTemp - 30) && #RoomTempDelta > 0) 		-- Compressor is not running. 2603.04 added && #RoomTempDelta > 0
 				|| %hour < 7 ||	%hour >22 || #RoomTempDelta > 0.2) then			-- compressor is off for a relative short time (depending on outside temperature) and #RoomTempDelta <= 0, SHifT to -5 to avoid short cycle.
@@ -224,6 +284,9 @@ on TaShift then
 		end
 		#SHifT = min(max(#SHifT, -5), 5);							-- keep #SHifT in the range -5 to +5
 		#Z1HRT = coalesce($WCS, #WCS) + #SHifT;							-- 2603.06 added coalesce to have correct #Z1HRT if #Compressor isn't running
+		if #CompState > 0 then									-- 2610.02 improved ramp up logic
+			#Z1HRT = min(#Z1HRT, max($WCS - 5, ceil(@Main_Outlet_Temp) - 1));
+		end
 		if @Z2_Heat_Request_Temp > 25 then							-- override if Z2 request is higher than 25 degrees
 			#Z1HRT = @Z2_Heat_Request_Temp;
 		end
@@ -479,15 +542,11 @@ on timer=8 then
 	?dhwSetpoint = @DHW_Target_Temp;								-- sync OpenTherm value with HP value
 	#CoolingEnable = #CoolingEnable + 0.1 * (?CoolingEnable - #CoolingEnable);			-- avoid #CoolingEnable to react on short error ?CoolingEnable
 	#RoomSetpoint = min(max(?roomTempSet, 10), 22);
-	if ?maxRelativeModulation != 100 then								-- using MM to communicate current room temp. replace with #RoomTemp = ?roomTemp if your thermostat is providing a good, stable value.
-		#RoomTemp = 15 + ?maxRelativeModulation / 10;
-	else
-		#RoomTemp = #RoomSetpoint;
-	end
+	#RoomTemp = ?roomTemp;										-- 2610.03 otgw 6.7 has introduced the RT command, now ?roomTemp can be used
 	#RoomTempDelta = #RoomTemp - #RoomSetpoint;
 	if ?chEnable == 1 then
 		#chEnableTimeOff = -1;
-		if #chEnable == 0 && #RoomTemp != 15 then						-- 2605.01 safeguard: prevent transition #chEnable 0 -> 1 if #RoomTemp is 15, which means Evohome is OFF and no valid room temperature is provided via ?maxRelativeModulation
+		if #chEnable == 0 then
 			#chEnableChangeTime = #Time;							-- set #chEnableChangeTime if #chEnable changes
 			#chEnable = 1;
 		end
