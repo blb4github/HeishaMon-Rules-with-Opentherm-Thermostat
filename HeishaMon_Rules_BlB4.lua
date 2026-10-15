@@ -1,5 +1,5 @@
 on System#Boot then
-	print('BLB Heishamon_rules_2610.03.lua');
+	print('BLB Heishamon_rules_2610.04.lua');
 	#chEnableOnMin = -1;
 	#chEnableChangeTime = -1;
 	#chEnableTimeOff = -1;
@@ -121,10 +121,16 @@ on TaShift then
 			if #TaDelta >= 3 then
 				#SHifT = ceil(@Main_Outlet_Temp) - 2 - $WCS;
 			end
-		elseif ((#CompRunMin > (-2 * #OutsideTemp - 30) && #RoomTempDelta > 0) || %hour < 7 || %hour > 22 || #RoomTempDelta > 0.2) then
+		elseif (%hour < 7 || %hour > 22 || #RoomTempDelta > 0.2) then
 			#SHifT = -5;
+		elseif #CompRunMin > (-2 * #OutsideTemp - 30) then
+    			if #RoomTempDelta > 0.1 then
+        			#SHifT = -5;
+    			elseif #RoomTempDelta <= 0 or #SHifT != -5 then
+        			#SHifT = 0;
+    			end
 		else
-			#SHifT = 0;
+    			#SHifT = 0;
 		end
 		#SHifT = min(max(#SHifT, -5), 5);
 		#Z1HRT = coalesce($WCS, #WCS) + #SHifT;
