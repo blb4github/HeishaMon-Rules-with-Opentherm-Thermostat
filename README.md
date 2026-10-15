@@ -2,9 +2,9 @@
 
 These are the rules I use to control a Panasonic heat pump with an OpenTherm thermostat. They are tailored to my installation; use them as inspiration and adapt the settings and integration to your own system.
 
-## Current version: 2610.03
+## Current version: 2610.04
 
-See [CHANGELOG.md](CHANGELOG.md) for the changes in each published version; release 2610.03 is compared with the previously published version 2610.01.
+See [CHANGELOG.md](CHANGELOG.md) for the changes in each published version.
 
 | File | Purpose |
 | --- | --- |
@@ -43,7 +43,13 @@ The room setpoint and current room temperature are transported as their normal O
 - If the thermostat does not itself provide Data-ID 24, the OTGW can be configured to provide it as an alternative Data-ID (`AA=24`).
 - `?chEnable` remains the heating-demand signal from Evohome; short off periods are filtered by the rules with a delay greater than 15 minutes.
 
-The old use of `?maxRelativeModulation` as an encoded room-temperature transport is no longer used in 2610.03.
+The old use of `?maxRelativeModulation` as an encoded room-temperature transport is no longer used.
+
+### Filtering the room temperature upstream
+
+In this installation the Evohome/ramses room-temperature value occasionally shows short, non-physical spikes or dips. Because `?roomTemp` is used directly by TaShift and the thermostat logic, such glitches can otherwise cause a short target-temperature jump.
+
+Home Assistant therefore filters the raw living-room temperature before sending it to the OTGW with `RT=`. The current setup uses a Home Assistant `filter` sensor with a `lowpass` filter, `time_constant: 15` and `precision: 2`, and the OTGW automation rounds the filtered result to 0.1 °C before sending it. This filtering is installation-specific and is not part of the HeishaMon rules themselves.
 
 ## Other integration values to check
 
@@ -57,7 +63,7 @@ The old use of `?maxRelativeModulation` as an encoded room-temperature transport
 
 1. Save a copy of your existing rules and check the settings and integration above.
 2. Load the contents of `HeishaMon_Rules_BlB4.lua` into the HeishaMon rules editor, without Markdown fences.
-3. Check the boot log for `BLB Heishamon_rules_2610.03.lua` and monitor operation in your installation.
+3. Check the boot log for `BLB Heishamon_rules_2610.04.lua` and monitor operation in your installation.
 4. Verify that `?roomTempSet` and `?roomTemp` contain the intended living-room target and current temperature before relying on room-temperature correction.
 
 For edits, work in `HeishaMon_Rules_BlB4_commented.lua`, then generate the ready-to-load file using the [HeishaMon rules minifier](https://github.com/klaashoekstra94/heishamon_rules_minify). Keep both files in sync.
