@@ -1,5 +1,28 @@
 # Changelog
 
+## 2610.04 — 2026-10-15
+
+Changes since published version **2610.03**.
+
+### TaShift idle hysteresis
+
+- Add hysteresis to the compressor-off TaShift logic to avoid repeated target switching around the room setpoint.
+- Keep a previously active `#SHifT = -5` while `#RoomTempDelta` remains between 0 and +0.1 °C.
+- Switch to `#SHifT = -5` when `#RoomTempDelta > 0.1` °C once the compressor-off duration condition is met.
+- Release the retained −5 °C shift when `#RoomTempDelta <= 0`, or when the shift was not already −5 °C.
+- Existing night-time and `#RoomTempDelta > 0.2` behaviour remains unchanged.
+
+### Room-temperature input
+
+- The rules continue to use `?roomTemp` directly through OpenTherm Data-ID 24.
+- During validation, short non-physical Evohome/ramses room-temperature spikes were observed. They can make the rules correctly react to a false temperature step and therefore cause a short heating-target jump.
+- In the current installation this is handled upstream in Home Assistant with a low-pass filtered room-temperature sensor (`time_constant: 15`, `precision: 2`) before sending `RT=<temperature>` to the OTGW. This is an integration measure, not a rules-language change.
+
+### Validation
+
+- Confirmed in detailed HeishaMon logging that a short 25 → 30 °C target jump was caused by a `?roomTemp` glitch, not by an unexplained Panasonic target reset: timer 3 explicitly set `#SHifT = 0` and `#Z1HRT = 30` after the false negative room-temperature delta.
+- Update the boot version string and repository documentation to 2610.04.
+
 ## 2610.03 — 2026-10-11
 
 Changes since published version **2610.01**. Intermediate local version 2610.02 is intentionally included in this release rather than documented as a separate published release.
@@ -84,4 +107,3 @@ Consolidated changes since the previously published GitHub version **2602.22d**.
 - Provide the ready-to-load rules as `HeishaMon_Rules_BlB4.lua` and the documented source as `HeishaMon_Rules_BlB4_commented.lua`.
 - Replace the obsolete `.md`/`.txt` rules files and update installation, firmware and Home Assistant integration notes.
 - Remove the stale README reference to ExternalOverride; its removal predates this release.
-
