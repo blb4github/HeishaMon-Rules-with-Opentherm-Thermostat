@@ -2,7 +2,7 @@
 
 These are the rules I use to control a Panasonic heat pump with an OpenTherm thermostat. They are tailored to my installation; use them as inspiration and adapt the settings and integration to your own system.
 
-## Current version: 2610.04
+## Current version: 2610.06
 
 See [CHANGELOG.md](CHANGELOG.md) for the changes in each published version.
 
@@ -51,6 +51,14 @@ In this installation the Evohome/ramses room-temperature value occasionally show
 
 Home Assistant therefore filters the raw living-room temperature before sending it to the OTGW with `RT=`. The current setup uses a Home Assistant `filter` sensor with a `lowpass` filter, `time_constant: 15` and `precision: 2`, and the OTGW automation rounds the filtered result to 0.1 °C before sending it. This filtering is installation-specific and is not part of the HeishaMon rules themselves.
 
+## HEMS GPIO heat-demand block (2610.05)
+
+Timer 8 reads `gpio(33)`. Only an explicit value of `1` forces the internal filtered `#chEnable` to zero; otherwise normal Evohome `?chEnable` processing applies. This affects the filtered demand input, while actual heat-pump stop conditions are still evaluated by timer 4.
+
+## Startup behaviour
+
+When the rules are loaded while the compressor is already running, timer 1 marks it with `#CompState = 2`. Version 2610.06 retains the existing TaShift target-write logic; a proposed additional guard to prevent a transient downward target write during a running-compressor reload is **not included** in these uploaded files.
+
 ## Other integration values to check
 
 - `?dhwEnable` enables the rules' DHW control.
@@ -63,7 +71,7 @@ Home Assistant therefore filters the raw living-room temperature before sending 
 
 1. Save a copy of your existing rules and check the settings and integration above.
 2. Load the contents of `HeishaMon_Rules_BlB4.lua` into the HeishaMon rules editor, without Markdown fences.
-3. Check the boot log for `BLB Heishamon_rules_2610.04.lua` and monitor operation in your installation.
+3. Check the boot log for `BLB Heishamon_rules_2610.06.lua` and monitor operation in your installation.
 4. Verify that `?roomTempSet` and `?roomTemp` contain the intended living-room target and current temperature before relying on room-temperature correction.
 
 For edits, work in `HeishaMon_Rules_BlB4_commented.lua`, then generate the ready-to-load file using the [HeishaMon rules minifier](https://github.com/klaashoekstra94/heishamon_rules_minify). Keep both files in sync.
