@@ -71,6 +71,9 @@ Release
 2610.02		Improved startup cycle without jump from 25 to 30 degrees
 2610.03		Simplified room temperature handling: since OTGW firmware 6.7, RT can provide Room Temperature directly via OpenTherm ID 24.
 2610.04		Added hysteresis to TaShift during off period
+2610.05		Introduced HEMS Heat-Dim blocking via GPIO33 in Timer=8 (sync OpenTherm & Heatpump) to be able to block heating immediately if GPIO33 = 1.
+		GPIO33 = 0: normal Evohome chEnable logic. Only an explicit GPIO state 1 blocks heating, so any other state is fail-safe normal operation.
+2610.06		1) Correct summer month logic in DHW, 2) restart using #DHWComfortDay in DHW
 
 **My environment:**
 a) Panasonic WH-MDC07J3E5 Heat Pump used for heating, Cooling and DHW (external tank);
@@ -114,7 +117,7 @@ e) Settings Heat Pump: Heating_Mode: 1 (direct), Cooling_Mode: 1 (direct), Buffe
 *Called by*:	system Boot
 rule 01]]
 on System#Boot then
-	print('BLB Heishamon_rules_2610.04.lua');
+	print('BLB Heishamon_rules_2610.06.lua');
 	#chEnableOnMin = -1;			-- Duration (in Minutes) chEnable on (positive) or off (negative)
 	#chEnableChangeTime = -1;		-- Time #chEnable changes
 	#chEnableTimeOff = -1;			-- Time ?chEnable goes off (0)
@@ -277,16 +280,14 @@ on TaShift then
 			if #TaDelta >= 3 then								-- 2610.02 taken out ($WCS + #SHifT - @Main_Outlet_Temp >=3) again to improve start up logic
 				#SHifT = ceil(@Main_Outlet_Temp) - 2 - $WCS;
 			end
+
 		elseif (%hour < 7 || %hour > 22 || #RoomTempDelta > 0.2) then				-- compressor is off for a relative short time (depending on outside temperature) and #RoomTempDelta <= 0, SHifT to -5 to avoid short cycle. 603.04 added && #RoomTempDelta > 0
 			#SHifT = -5;
-		elseif #CompRunMin > (- 2 * #OutsideTemp - 30) then 					-- Compressor is not running. 
-    			if #RoomTempDelta > 0.1 then							-- 2610.04 added hysteresis
-        			#SHifT = -5;
-    			elseif #RoomTempDelta <= 0 or #SHifT != -5 then
-        			#SHifT = 0;								-- default SHifT to 0 if compressor is off for a longer time and room temperature isn't too high
-    			end
+		elseif #CompRunMin > (-2 * #OutsideTemp - 30) && 					-- Compressor is not running. 
+			(#RoomTempDelta > 0.1 || (#RoomTempDelta > 0 && #SHifT == -5)) then		-- 2610.04 added hysteresis
+			#SHifT = -5;
 		else
-    			#SHifT = 0;									-- default SHifT to 0 if compressor is off for a longer time and room temperature isn't too high
+			#SHifT = 0;									-- default SHifT to 0 if compressor is off for a longer time and room temperature isn't too high
 		end
 		#SHifT = min(max(#SHifT, -5), 5);							-- keep #SHifT in the range -5 to +5
 		#Z1HRT = coalesce($WCS, #WCS) + #SHifT;							-- 2603.06 added coalesce to have correct #Z1HRT if #Compressor isn't running
@@ -371,8 +372,8 @@ rule 09]]
 on timer=5 then
 	setTimer(5,900);										-- run this rule every 15 minutes.
 	if @Defrosting_State == 0 && ?dhwEnable then							-- don't run during Defrost or ?dhwEnable isn't true
-		$DHWTime = 13;
-		if (%month > 3 || %month < 9) && %hour == 8 && #OutsideTemp > 20 then			-- 2511.14 added $DHWTime to perform DHWRun early morning during Cooling period  
+		$DHWTime = 13;										-- 2511.14 added $DHWTime to perform DHWRun early morning during Cooling period
+		if (%month > 3 && %month < 9) && %hour == 8 && #OutsideTemp > 20 then  			-- 2610.06 Correct Summer Month logic (|| replaced by &&)
 			$DHWTime = 8;
 		elseif #OutsideTemp < 4 then								-- 2601.02 added logic to do DHWRun early night during very cold weather.
 			$DHWTime = 0;
@@ -396,7 +397,7 @@ on timer=5 then
 			) || 
 			(%hour == $DHWTime && (
 				(%day == #DHWSterilizationDay && @DHW_Temp < 50) ||			-- 2610.01 changed from < 55 to < 50 degrees
-				(%day == 4 && @DHW_Temp < (@DHW_Target_Temp - 3)) ||
+				(%day == #DHWComfortDay && @DHW_Temp < (@DHW_Target_Temp - 3)) ||
 				(@DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta))
 			))
 		) then
@@ -550,22 +551,31 @@ on timer=8 then
 	#RoomSetpoint = min(max(?roomTempSet, 10), 22);
 	#RoomTemp = ?roomTemp;										-- 2610.03 otgw 6.7 has introduced the RT command, now ?roomTemp can be used
 	#RoomTempDelta = #RoomTemp - #RoomSetpoint;
-	if ?chEnable == 1 then
-		#chEnableTimeOff = -1;
-		if #chEnable == 0 then
-			#chEnableChangeTime = #Time;							-- set #chEnableChangeTime if #chEnable changes
-			#chEnable = 1;
-		end
-	else
-		if #chEnableTimeOff < 0 then								-- set #chEnableTimeOff if ?chEnable has changed to 0
-			#chEnableTimeOff = #Time;
-		end
-		$chEnableOffElapsed = (#Time - #chEnableTimeOff + 10080) % 10080;			-- elapsed time with week wrap correction
-		if $chEnableOffElapsed > 15 && #chEnable == 1 then
+	if gpio(33) == 1 then										-- 2610.05 HEMS Heat-Dim blocking via GPIO33. 1: HEMS blocks heating immediately,
+		#chEnableTimeOff = -1;									-- 0: normal Evohome chEnable logic.
+		if #chEnable == 1 then
 			#chEnable = 0;
 			#chEnableChangeTime = #Time;							-- set #chEnableChangeTime if #chEnable changes
-		end											-- Evohome sometimes sets chEnable off for 5 minutes
+		end
+	else
+		if ?chEnable == 1 then
+			#chEnableTimeOff = -1;
+			if #chEnable == 0 then
+				#chEnableChangeTime = #Time;						-- set #chEnableChangeTime if #chEnable changes
+				#chEnable = 1;
+			end
+		else
+			if #chEnableTimeOff < 0 then							-- set #chEnableTimeOff if ?chEnable has changed to 0
+				#chEnableTimeOff = #Time;
+			end
+			$chEnableOffElapsed = (#Time - #chEnableTimeOff + 10080) % 10080;		-- elapsed time with week wrap correction
+			if $chEnableOffElapsed > 15 && #chEnable == 1 then
+				#chEnable = 0;
+				#chEnableChangeTime = #Time;						-- set #chEnableChangeTime if #chEnable changes
+			end										-- Evohome sometimes sets chEnable off for 5 minutes
+		end
 	end
+
 	$chEnableElapsed = (#Time - #chEnableChangeTime + 10080) % 10080;
 	if #chEnable == 1 then
 		#chEnableOnMin = $chEnableElapsed;
