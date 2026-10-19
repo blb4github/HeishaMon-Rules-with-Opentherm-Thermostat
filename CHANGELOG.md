@@ -1,5 +1,18 @@
 # Changelog
 
+## 2610.06 — 2026-10-20
+
+Changes present in the supplied 2610.06 files since the 2610.04 GitHub release:
+
+- Correct the warm-season check for an early DHW run: `%month > 3 && %month < 9` (April–August) instead of the always-true OR expression.
+- Replace the hard-coded DHW comfort-day comparison with `%day == #DHWComfortDay`.
+- Retain the GPIO33 HEMS heat-demand block introduced in local version 2610.05.
+- No additional running-compressor restart target-write guard is present in the supplied 2610.06 executable code.
+
+## 2610.05 — local intermediate version
+
+- Add a HEMS heat-demand block using `gpio(33)` in timer 8. An explicit value of 1 sets internal `#chEnable` to zero; otherwise the normal Evohome demand logic is applied. The actual heat-pump stop decision remains subject to timer 4 conditions.
+
 ## 2610.04 — 2026-10-15
 
 Changes since published version **2610.03**.
