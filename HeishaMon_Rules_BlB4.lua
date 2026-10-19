@@ -1,5 +1,5 @@
 on System#Boot then
-	print('BLB Heishamon_rules_2610.04.lua');
+	print('BLB Heishamon_rules_2610.06.lua');
 	#chEnableOnMin = -1;
 	#chEnableChangeTime = -1;
 	#chEnableTimeOff = -1;
@@ -187,7 +187,7 @@ on timer=5 then
 	setTimer(5,900);
 	if @Defrosting_State == 0 && ?dhwEnable then
 		$DHWTime = 13;
-		if (%month > 3 || %month < 9) && %hour == 8 && #OutsideTemp > 20 then
+		if (%month > 3 && %month < 9) && %hour == 8 && #OutsideTemp > 20 then
 			$DHWTime = 8;
 		elseif #OutsideTemp < 4 then
 			$DHWTime = 0;
@@ -195,7 +195,7 @@ on timer=5 then
 		if #DHWRun < 1 && @ThreeWay_Valve_State == 0 && ((@DHW_Temp <= (@DHW_Target_Temp + @DHW_Heat_Delta - 10))|| 
 			(%hour >= 9 && (@DHW_Temp <= (@DHW_Target_Temp + @DHW_Heat_Delta - 5)|| 
 				@DHW_Temp < (#DHWTempP - 5)))|| 
-			(%hour == $DHWTime && ((%day == #DHWSterilizationDay && @DHW_Temp < 50) || (%day == 4 && @DHW_Temp < (@DHW_Target_Temp - 3)) || (@DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta))))) then
+			(%hour == $DHWTime && ((%day == #DHWSterilizationDay && @DHW_Temp < 50) || (%day == #DHWComfortDay && @DHW_Temp < (@DHW_Target_Temp - 3)) || (@DHW_Temp < (@DHW_Target_Temp + @DHW_Heat_Delta))))) then
 			#DHWRun = 2;
 			#OMP = @Operating_Mode_State;
 			#HPStateP = @Heatpump_State;
@@ -300,22 +300,31 @@ on timer=8 then
 	#RoomSetpoint = min(max(?roomTempSet, 10), 22);
 	#RoomTemp = ?roomTemp;
 	#RoomTempDelta = #RoomTemp - #RoomSetpoint;
-	if ?chEnable == 1 then
+	if gpio(33) == 1 then
 		#chEnableTimeOff = -1;
-		if #chEnable == 0 then
-			#chEnableChangeTime = #Time;
-			#chEnable = 1;
-		end
-	else
-		if #chEnableTimeOff < 0 then
-			#chEnableTimeOff = #Time;
-		end
-		$chEnableOffElapsed = (#Time - #chEnableTimeOff + 10080) % 10080;
-		if $chEnableOffElapsed > 15 && #chEnable == 1 then
+		if #chEnable == 1 then
 			#chEnable = 0;
 			#chEnableChangeTime = #Time;
 		end
+	else
+		if ?chEnable == 1 then
+			#chEnableTimeOff = -1;
+			if #chEnable == 0 then
+				#chEnableChangeTime = #Time;
+				#chEnable = 1;
+			end
+		else
+			if #chEnableTimeOff < 0 then
+				#chEnableTimeOff = #Time;
+			end
+			$chEnableOffElapsed = (#Time - #chEnableTimeOff + 10080) % 10080;
+			if $chEnableOffElapsed > 15 && #chEnable == 1 then
+				#chEnable = 0;
+				#chEnableChangeTime = #Time;
+			end
+		end
 	end
+
 	$chEnableElapsed = (#Time - #chEnableChangeTime + 10080) % 10080;
 	if #chEnable == 1 then
 		#chEnableOnMin = $chEnableElapsed;
