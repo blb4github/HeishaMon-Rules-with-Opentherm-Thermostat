@@ -2,7 +2,7 @@
 
 These are the rules I use to control a Panasonic heat pump with an OpenTherm thermostat. They are tailored to my installation; use them as inspiration and adapt the settings and integration to your own system.
 
-## Current version: 2610.06
+## Current version: 2610.08
 
 See [CHANGELOG.md](CHANGELOG.md) for the changes in each published version.
 
@@ -41,7 +41,7 @@ The room setpoint and current room temperature are transported as their normal O
 - `?roomTempSet` is the room setpoint (OpenTherm Data-ID 16). In this setup Home Assistant writes the living-room target temperature to the OTGW with `BS=<temperature>`. The rules limit the resulting setpoint to 10–22 °C.
 - `?roomTemp` is the current room temperature (OpenTherm Data-ID 24). Home Assistant writes the living-room current temperature to the OTGW with `RT=<temperature>`. The `RT=` command requires OTGW firmware 6.7 or newer.
 - If the thermostat does not itself provide Data-ID 24, the OTGW can be configured to provide it as an alternative Data-ID (`AA=24`).
-- `?chEnable` remains the heating-demand signal from Evohome; short off periods are filtered by the rules with a delay greater than 15 minutes.
+- `?chEnable` is the Evohome heating-demand signal in **normal mode** (GPIO33 != 1); short off periods are filtered by the rules with a delay greater than 15 minutes. In **Dim mode** (GPIO33 == 1), internal demand is determined from room-temperature hysteresis instead.
 
 The old use of `?maxRelativeModulation` as an encoded room-temperature transport is no longer used.
 
@@ -51,13 +51,22 @@ In this installation the Evohome/ramses room-temperature value occasionally show
 
 Home Assistant therefore filters the raw living-room temperature before sending it to the OTGW with `RT=`. The current setup uses a Home Assistant `filter` sensor with a `lowpass` filter, `time_constant: 15` and `precision: 2`, and the OTGW automation rounds the filtered result to 0.1 °C before sending it. This filtering is installation-specific and is not part of the HeishaMon rules themselves.
 
-## HEMS GPIO heat-demand block (2610.05)
+## HEMS Dim mode on GPIO33 (2610.08)
 
-Timer 8 reads `gpio(33)`. Only an explicit value of `1` forces the internal filtered `#chEnable` to zero; otherwise normal Evohome `?chEnable` processing applies. This affects the filtered demand input, while actual heat-pump stop conditions are still evaluated by timer 4.
+Timer 8 uses `gpio(33)` to select how the internal `#chEnable` heating-demand state is determined:
 
-## Startup behaviour
+- **GPIO33 is exactly 1 — HEMS Dim mode.** Evohome `?chEnable` is ignored for this demand calculation. Instead the room-temperature difference `#RoomTempDelta = #RoomTemp - #RoomSetpoint` controls `#chEnable` with hysteresis: heating demand becomes **1 below the room setpoint** (delta < 0 °C), becomes **0 above the room setpoint by more than 0.2 °C** (delta > +0.2 °C), and **retains its previous state** between those thresholds. The normal Evohome off-delay is cleared in Dim mode.
+- **GPIO33 is anything other than 1 — normal Evohome mode.** Heating demand follows `?chEnable`; transient Evohome off signals are filtered, requiring an off period of more than 15 minutes before clearing an active `#chEnable`.
 
-When the rules are loaded while the compressor is already running, timer 1 marks it with `#CompState = 2`. Version 2610.06 retains the existing TaShift target-write logic; a proposed additional guard to prevent a transient downward target write during a running-compressor reload is **not included** in these uploaded files.
+Whenever `#chEnable` changes, timer 8 updates `#chEnableChangeTime`; the normal elapsed-time bookkeeping is retained. **This does not directly switch the heat pump on or off**: timer 4 still applies room-temperature, outside-temperature, compressor-runtime, overnight and other conditions before changing the required heat-pump state. In particular, turning on Dim mode is not an unconditional or immediate heat-pump stop.
+
+The 2610.08 Dim behaviour supersedes the simpler GPIO33 heat-demand block from 2610.05/2610.06.
+
+## Startup protection (2610.07)
+
+The `on @Main_Outlet_Temp` handler now calls `TaShift()` only when `isset(#Time)` is true. Timer 1 initialises `#Time` and adopts the current heat-pump state, including `#CompState = 2` if the compressor is already running at startup. This prevents the outlet-temperature event from calling TaShift before timer 1 has initialised the rules' state.
+
+This is **an initialisation-order guard**, not a three-minute ban on lowering the heating target; the rest of the TaShift setpoint logic remains unchanged.
 
 ## Other integration values to check
 
@@ -65,13 +74,13 @@ When the rules are loaded while the compressor is already running, timer 1 marks
 - `?CoolingEnable` enables cooling and is smoothed by the rules. Home Assistant supplies `?coolingControl` from its dew-point calculation; the rules apply further water-temperature limits. Configure this external calculation for your installation.
 - `@Z2_Heat_Request_Temp` provides a heating-target override: 15–25 corresponds to a −5 to +5 °C shift around 20; values above 25 request a direct temperature.
 - `@Buffer_Tank_Delta` below 4 overrides Quiet Mode.
-- Review the DHW settings, hardcoded comfort-day condition (`%day == 4`), `#DHWSterilizationDay`, weather-curve settings, hardcoded upper curve temperature (36 °C) and pump settings before use. The `#DHWComfortDay` variable is initialised but the trigger currently uses the hardcoded day.
+- Review the DHW settings (including `#DHWComfortDay` and `#DHWSterilizationDay`), weather-curve settings, fixed upper curve temperature (36 °C), GPIO33 wiring/mode and pump settings before use.
 
 ## Loading and editing
 
 1. Save a copy of your existing rules and check the settings and integration above.
 2. Load the contents of `HeishaMon_Rules_BlB4.lua` into the HeishaMon rules editor, without Markdown fences.
-3. Check the boot log for `BLB Heishamon_rules_2610.06.lua` and monitor operation in your installation.
+3. Check the boot log for `BLB Heishamon_rules_2610.08.lua` and monitor operation in your installation.
 4. Verify that `?roomTempSet` and `?roomTemp` contain the intended living-room target and current temperature before relying on room-temperature correction.
 
 For edits, work in `HeishaMon_Rules_BlB4_commented.lua`, then generate the ready-to-load file using the [HeishaMon rules minifier](https://github.com/klaashoekstra94/heishamon_rules_minify). Keep both files in sync.
