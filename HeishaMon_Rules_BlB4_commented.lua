@@ -74,6 +74,8 @@ Release
 2610.05		Introduced HEMS Heat-Dim blocking via GPIO33 in Timer=8 (sync OpenTherm & Heatpump) to be able to block heating immediately if GPIO33 = 1.
 		GPIO33 = 0: normal Evohome chEnable logic. Only an explicit GPIO state 1 blocks heating, so any other state is fail-safe normal operation.
 2610.06		1) Correct summer month logic in DHW, 2) restart using #DHWComfortDay in DHW
+2610.07		Correction to prevent on @Main_Outlet_Temp can be executed before on timer=1
+2610.08		GPIO33 now selects room-temperature-based #chEnable in Dim; Evohome demand is ignored in Dim.
 
 **My environment:**
 a) Panasonic WH-MDC07J3E5 Heat Pump used for heating, Cooling and DHW (external tank);
@@ -117,7 +119,7 @@ e) Settings Heat Pump: Heating_Mode: 1 (direct), Cooling_Mode: 1 (direct), Buffe
 *Called by*:	system Boot
 rule 01]]
 on System#Boot then
-	print('BLB Heishamon_rules_2610.06.lua');
+	print('BLB Heishamon_rules_2610.08.lua');
 	#chEnableOnMin = -1;			-- Duration (in Minutes) chEnable on (positive) or off (negative)
 	#chEnableChangeTime = -1;		-- Time #chEnable changes
 	#chEnableTimeOff = -1;			-- Time ?chEnable goes off (0)
@@ -237,7 +239,9 @@ end
 rule 05, 06 & 07]]
 
 on @Main_Outlet_Temp then
-	TaShift();
+	if isset(#Time) then										-- 2610.07 added check to prevent TaShift() before Rules are properly initiated by on timer=1
+		TaShift();
+	end
 end
 
 on timer=3 then
@@ -551,11 +555,12 @@ on timer=8 then
 	#RoomSetpoint = min(max(?roomTempSet, 10), 22);
 	#RoomTemp = ?roomTemp;										-- 2610.03 otgw 6.7 has introduced the RT command, now ?roomTemp can be used
 	#RoomTempDelta = #RoomTemp - #RoomSetpoint;
-	if gpio(33) == 1 then										-- 2610.05 HEMS Heat-Dim blocking via GPIO33. 1: HEMS blocks heating immediately,
-		#chEnableTimeOff = -1;									-- 0: normal Evohome chEnable logic.
-		if #chEnable == 1 then
-			#chEnable = 0;
-			#chEnableChangeTime = #Time;							-- set #chEnableChangeTime if #chEnable changes
+	if gpio(33) == 1 then										-- 2610.08 HEMS Dim: select room-temperature-based chEnable instead of Evohome chEnable.
+		#chEnableTimeOff = -1;									-- Do not use Evohome off-delay in Dim mode.
+		if (#RoomTempDelta < 0 && #chEnable == 0) ||						-- Enable heat below effective room setpoint.
+			(#RoomTempDelta > 0.2 && #chEnable == 1) then					-- Disable heat >0.2 C above setpoint; retain state in between.
+			#chEnable = 1 - #chEnable;
+			#chEnableChangeTime = #Time;							-- Preserve duration bookkeeping used by timer=4.
 		end
 	else
 		if ?chEnable == 1 then
