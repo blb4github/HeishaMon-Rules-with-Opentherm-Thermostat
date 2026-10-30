@@ -1,5 +1,27 @@
 # Changelog
 
+## 2610.08 — 2026-10-30
+
+**HEMS Dim mode changes heating-demand selection (timer 8).**
+
+- When `gpio(33) == 1`, ignore Evohome `?chEnable` when calculating internal `#chEnable`. Instead apply living-room temperature hysteresis using `#RoomTempDelta = #RoomTemp - #RoomSetpoint`:
+  - With `#RoomTempDelta < 0`, switch internal `#chEnable` from 0 to 1 (room below setpoint).
+  - With `#RoomTempDelta > +0.2`, switch it from 1 to 0 (room more than 0.2 °C above setpoint).
+  - From 0 through +0.2 °C inclusive, preserve the previous state.
+- Reset `#chEnableTimeOff` in Dim mode, so Evohome's off-delay is not applied to this room-temperature demand.
+- Keep `#chEnableChangeTime` and the existing elapsed-time calculation when demand changes, preserving timer 4's runtime-dependent decisions.
+- With `gpio(33) != 1`, continue to use the existing filtered Evohome `?chEnable` logic with its greater-than-15-minute off delay.
+- **Important:** GPIO33 selects the internal heating-demand logic; it does **not** immediately force a compressor or heat-pump stop. Timer 4 continues applying its existing conditions before acting on a changed demand. This supersedes the direct internal demand-block behaviour introduced in 2610.05.
+- The upload includes both the tested ready-to-load rules and its commented source; no other executable logic was deliberately changed from 2610.06 aside from the 2610.07 guard below and this timer 8 change.
+
+## 2610.07 — intermediate local version
+
+**Prevent TaShift from running before rule state initialisation.**
+
+- The `on @Main_Outlet_Temp` event now checks `isset(#Time)` before calling `TaShift()`.
+- Timer 1 initialises `#Time` and the current compressor state after boot. Previously an early outlet-temperature event could invoke TaShift before that initialisation.
+- This specifically addresses early event ordering, including rules/firmware reload scenarios. It does not introduce a target-temperature floor or three-minute target-write restriction; existing TaShift calculations are otherwise retained.
+
 ## 2610.06 — 2026-10-20
 
 Changes present in the supplied 2610.06 files since the 2610.04 GitHub release:
