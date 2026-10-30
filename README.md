@@ -16,7 +16,7 @@ The `.lua` extension is a filename convention: these files use the **HeishaMon r
 ## My setup
 
 - Panasonic WH-MDC07J3E5 for heating, cooling and domestic hot water with an external tank; radiators and convectors.
-- HeishaMon Large. The supplied source identifies firmware builds `Alpha-f7ae839/Alpha-d8af83f` in the 4.0 development series. Use firmware that supports this ruleset's size, OpenTherm integration and `coalesce()` function; compatibility with other builds has not been verified here.
+- HeishaMon Large running a custom ESP32-S3 firmware build with extended GPIO support. **The standard HeishaMon firmware does not provide the `gpio(33)` Rules functionality used by version 2610.08.** See the firmware requirement below.
 - CZ-TAW1 connected to the proxy port; I do not use it actively.
 - Honeywell Evohome with an R8810 OpenTherm bridge, connected through an OpenTherm Gateway.
 - Home Assistant with Evohome and OpenTherm Gateway integrations. Home Assistant supplies the living-room target and current temperature through the OTGW as normal OpenTherm room values, because Evohome's `chSetpoint` is not suitable as the primary control input for this heat-pump strategy.
@@ -50,6 +50,14 @@ The old use of `?maxRelativeModulation` as an encoded room-temperature transport
 In this installation the Evohome/ramses room-temperature value occasionally shows short, non-physical spikes or dips. Because `?roomTemp` is used directly by TaShift and the thermostat logic, such glitches can otherwise cause a short target-temperature jump.
 
 Home Assistant therefore filters the raw living-room temperature before sending it to the OTGW with `RT=`. The current setup uses a Home Assistant `filter` sensor with a `lowpass` filter, `time_constant: 15` and `precision: 2`, and the OTGW automation rounds the filtered result to 0.1 °C before sending it. This filtering is installation-specific and is not part of the HeishaMon rules themselves.
+
+## Firmware requirement for GPIO33 (2610.08)
+
+**Important:** this ruleset uses `gpio(33)` in timer 8. The GPIO functionality is **not available in standard HeishaMon firmware**, so loading this ruleset on a standard build is not sufficient to enable HEMS Dim mode.
+
+The author's setup uses a custom HeishaMon Large / ESP32-S3 firmware integration from the [blb4github/HeishaMon fork](https://github.com/blb4github/HeishaMon), branch [`feature/integrate-extra-gpio`](https://github.com/blb4github/HeishaMon/tree/feature/integrate-extra-gpio). The integrated build was created at commit [`1aeeb015`](https://github.com/blb4github/HeishaMon/commit/1aeeb015) from upstream HeishaMon and the extra-GPIO work. This identifies the author's development build, **not an official supported firmware release**. Verify GPIO support and pin mapping against the actual installed firmware before using GPIO33.
+
+Firmware without the required Rules GPIO support may fail to parse or evaluate `gpio(33)`; do not assume that a normal build will silently ignore Dim mode. The other parts of this ruleset also depend on the HeishaMon 4.x Rules and OpenTherm functions mentioned above.
 
 ## HEMS Dim mode on GPIO33 (2610.08)
 
