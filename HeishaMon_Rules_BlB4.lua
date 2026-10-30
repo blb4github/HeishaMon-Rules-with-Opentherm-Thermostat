@@ -1,5 +1,5 @@
 on System#Boot then
-	print('BLB Heishamon_rules_2610.06.lua');
+	print('BLB Heishamon_rules_2610.08.lua');
 	#chEnableOnMin = -1;
 	#chEnableChangeTime = -1;
 	#chEnableTimeOff = -1;
@@ -83,7 +83,9 @@ on @Compressor_Freq then
 end
 
 on @Main_Outlet_Temp then
-	TaShift();
+	if isset(#Time) then
+		TaShift();
+	end
 end
 
 on timer=3 then
@@ -302,8 +304,8 @@ on timer=8 then
 	#RoomTempDelta = #RoomTemp - #RoomSetpoint;
 	if gpio(33) == 1 then
 		#chEnableTimeOff = -1;
-		if #chEnable == 1 then
-			#chEnable = 0;
+		if (#RoomTempDelta < 0 && #chEnable == 0) || (#RoomTempDelta > 0.2 && #chEnable == 1) then
+			#chEnable = 1 - #chEnable;
 			#chEnableChangeTime = #Time;
 		end
 	else
