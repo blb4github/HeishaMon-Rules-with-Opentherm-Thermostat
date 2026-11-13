@@ -1,6 +1,6 @@
 # Changelog
 
-## 2610.09 — review candidate (2026-11-13; not field-tested)
+## 2611.01 — review candidate (2026-11-13; not field-tested)
 
 **Improve timer 9 only: PI room correction, with no TaShift changes.**
 
