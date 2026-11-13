@@ -119,7 +119,7 @@ e) Settings Heat Pump: Heating_Mode: 1 (direct), Cooling_Mode: 1 (direct), Buffe
 *Called by*:	system Boot
 rule 01]]
 on System#Boot then
-	print('BLB Heishamon_rules_2610.09.lua');
+	print('BLB Heishamon_rules_2611.01.lua');
 	#chEnableOnMin = -1;			-- Duration (in Minutes) chEnable on (positive) or off (negative)
 	#chEnableChangeTime = -1;		-- Time #chEnable changes
 	#chEnableTimeOff = -1;			-- Time ?chEnable goes off (0)
