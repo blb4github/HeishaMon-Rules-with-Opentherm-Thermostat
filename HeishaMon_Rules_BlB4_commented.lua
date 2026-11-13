@@ -119,7 +119,7 @@ e) Settings Heat Pump: Heating_Mode: 1 (direct), Cooling_Mode: 1 (direct), Buffe
 *Called by*:	system Boot
 rule 01]]
 on System#Boot then
-	print('BLB Heishamon_rules_2611.02.lua');
+	print('BLB Heishamon_rules_2611.01.lua');
 	#chEnableOnMin = -1;			-- Duration (in Minutes) chEnable on (positive) or off (negative)
 	#chEnableChangeTime = -1;		-- Time #chEnable changes
 	#chEnableTimeOff = -1;			-- Time ?chEnable goes off (0)
@@ -235,7 +235,7 @@ end
   When the compressor is idle, the existing overnight and anti-cycle suppression remains for a
   warm room or absent heat demand; if the room is cold and heating is requested, PI can determine
   the target. The shift is clipped to +/-5C; an explicit zone 2 request >25C still overrides zone 1.
-  The former running-compressor outlet-based upper target cap was removed in 2611.02 because
+  The former running-compressor outlet-based upper target cap was removed in 2611.01 because
   it could suppress PI comfort demand for hours even with the room substantially below setpoint.
 *Result*: @SetZ1HeatRequestTemperature when the requested zone 1 target changes.
 *Called by*: @Main_Outlet_Temp event and timer 3
