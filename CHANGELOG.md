@@ -1,5 +1,18 @@
 # Changelog
 
+## 2611.01 — review candidate (2026-11-13; not field-tested)
+
+**Improve timer 9 only: PI room correction, with no TaShift changes.**
+
+- Reduce provisional gains to P=1.2 and I=0.02 per five-minute cycle (formerly P=3, I=0.1); remove D.
+- Preserve the integral across ordinary setpoint changes; P still responds immediately.
+- Integrate only with aggregate heat demand (`#chEnable=1`), available space heating (`#Heat=1`, `#DHWRun<2`, three-way valve in room position, no defrost), and `#RoomTempDelta<=+0.2°C`. This last threshold is a proxy for living-room heat availability, **not** a zone-valve measurement. A temporary compressor stop does not by itself suspend integration.
+- Hold the integral without resetting it whenever heating is not available, including during DHW diversion, defrost and night setback.
+- Conditional integration prevents additional I accumulation when the **candidate total PI output** exceeds ±5°C; integration in the opposite direction remains possible. Keep absolute integral limits ±50; with I=0.02 they represent at most ±1°C integral contribution.
+- Clamp `#RoomTempControl` to ±5°C. Remove obsolete `#PIDpreverror` and `#RoomSetpointP` state variables.
+- Offline replay of the 240 five-minute cycles from 2026-11-12: proposed PI ~+2°C at 09:02, 13:32 and 15:02 versus old PID +7/+8/+7°C. This holds the historical room-temperature series fixed and is **not a closed-loop physical forecast**.
+- **Deliberately unchanged:** TaShift still has its outlet-dependent cap that prevented positive PID corrections from reaching the heat-pump target on 2026-11-12. Requires separate review before deployment.
+
 ## 2610.08 — 2026-10-30
 
 **HEMS Dim mode changes heating-demand selection (timer 8).**

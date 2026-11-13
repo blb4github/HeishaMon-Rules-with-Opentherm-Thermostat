@@ -2,7 +2,7 @@
 
 These are the rules I use to control a Panasonic heat pump with an OpenTherm thermostat. They are tailored to my installation; use them as inspiration and adapt the settings and integration to your own system.
 
-## Current version: 2610.08
+## Current version: 2611.01 (review candidate)
 
 See [CHANGELOG.md](CHANGELOG.md) for the changes in each published version.
 
@@ -16,7 +16,7 @@ The `.lua` extension is a filename convention: these files use the **HeishaMon r
 ## My setup
 
 - Panasonic WH-MDC07J3E5 for heating, cooling and domestic hot water with an external tank; radiators and convectors.
-- HeishaMon Large running a custom ESP32-S3 firmware build with extended GPIO support. **The standard HeishaMon firmware does not provide the `gpio(33)` Rules functionality used by version 2610.08.** See the firmware requirement below.
+- HeishaMon Large running a custom ESP32-S3 firmware build with extended GPIO support. **The standard HeishaMon firmware does not provide the `gpio(33)` Rules functionality used by version 2610.08 and later.** See the firmware requirement below.
 - CZ-TAW1 connected to the proxy port; I do not use it actively.
 - Honeywell Evohome with an R8810 OpenTherm bridge, connected through an OpenTherm Gateway.
 - Home Assistant with Evohome and OpenTherm Gateway integrations. Home Assistant supplies the living-room target and current temperature through the OTGW as normal OpenTherm room values, because Evohome's `chSetpoint` is not suitable as the primary control input for this heat-pump strategy.
@@ -30,7 +30,7 @@ The `.lua` extension is a filename convention: these files use the **HeishaMon r
 3. Schedule DHW and sterilisation runs, with additional tank-temperature triggers and restoration of the previous operating mode/state.
 4. Synchronise heat-pump temperatures and operating status with OpenTherm.
 5. Control heating demand using filtered `chEnable`, room-temperature difference, outside temperature and runtime conditions.
-6. Calculate weather compensation and use TaShift with room-temperature PID correction to adjust the heating target and support longer compressor runs.
+6. Calculate weather compensation and use TaShift with room-temperature PI correction to adjust the heating target and support longer compressor runs.
 7. Control cooling using Home Assistant/OpenTherm enable and water-temperature requests.
 8. Handle the weekly clock rollover in compressor and thermostat elapsed-time calculations.
 
@@ -55,7 +55,7 @@ Home Assistant therefore filters the raw living-room temperature before sending 
 
 **Important:** this ruleset uses `gpio(33)` in timer 8. The GPIO functionality is **not available in standard HeishaMon firmware**, so loading this ruleset on a standard build is not sufficient to enable HEMS Dim mode.
 
-**Compatible custom firmware release:** [HeishaMon Large – GPIO + synchronous webserver (`blb4-gpio-webserver-1.0.0`)](https://github.com/blb4github/HeishaMon/releases/tag/blb4-gpio-webserver-1.0.0). This is an author's pre-release build with extended GPIO support, built from commit [`20df324`](https://github.com/blb4github/HeishaMon/commit/20df32456cdb5a189d614e9424b73c099a19f5dd) and published with the firmware artifact `Heishamon-firmware-Alpha-20df324.zip`. It provides the GPIO functionality needed for the Rules 2610.08 HEMS Dim feature. It also contains experimental improvements to the synchronous webserver; it is **not an official upstream HeishaMon release**.
+**Compatible custom firmware release:** [HeishaMon Large – GPIO + synchronous webserver (`blb4-gpio-webserver-1.0.0`)](https://github.com/blb4github/HeishaMon/releases/tag/blb4-gpio-webserver-1.0.0). This is an author's pre-release build with extended GPIO support, built from commit [`20df324`](https://github.com/blb4github/HeishaMon/commit/20df32456cdb5a189d614e9424b73c099a19f5dd) and published with the firmware artifact `Heishamon-firmware-Alpha-20df324.zip`. It provides the GPIO functionality needed for the Rules 2610.08 and later HEMS Dim feature. It also contains experimental improvements to the synchronous webserver; it is **not an official upstream HeishaMon release**.
 
 The firmware source is in the [blb4github/HeishaMon fork](https://github.com/blb4github/HeishaMon). Download the firmware attachment from the linked release, rather than assuming the current head of a development branch is identical to this build. Verify the firmware binary matches your HeishaMon hardware and GPIO configuration before flashing.
 

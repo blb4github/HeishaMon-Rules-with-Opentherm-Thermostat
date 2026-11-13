@@ -119,7 +119,7 @@ e) Settings Heat Pump: Heating_Mode: 1 (direct), Cooling_Mode: 1 (direct), Buffe
 *Called by*:	system Boot
 rule 01]]
 on System#Boot then
-	print('BLB Heishamon_rules_2610.08.lua');
+	print('BLB Heishamon_rules_2611.01.lua');
 	#chEnableOnMin = -1;			-- Duration (in Minutes) chEnable on (positive) or off (negative)
 	#chEnableChangeTime = -1;		-- Time #chEnable changes
 	#chEnableTimeOff = -1;			-- Time ?chEnable goes off (0)
@@ -134,7 +134,6 @@ on System#Boot then
 	#Heat = -1;				-- HP in OM which includes Heat
 	#OMP = -1;				-- Previous Operating Mode
 	#QMR = -1;				-- Required Quiet Mode
-	#PIDpreverror = 0;			-- PID previous error for the Integral function
 	#PIDintegral = 0;			-- cummulative Integral value
 	#RoomTempDelta = 0;			-- Delta between Room Setpoint and Room Temp (positive = temp above setpoint)
 	#RoomTempControl = 0;			-- SHifT Ta as result of #RoomTempDelta
@@ -165,7 +164,6 @@ on timer=1 then
 	#OMR = @Operating_Mode_State;									-- set Required Operating Mode to current state
 	#OutsideTemp = @Outside_Temp;									-- set OusideTemp
 	#RoomSetpoint = min(max(?roomTempSet, 10), 22);							-- Room Setpoint
-	#RoomSetpointP = #RoomSetpoint;									-- Previous Room Setpoint
 	#RoomTemp = ?roomTemp;										-- Room Temperature. 2610.03 changed to use ?roomTemp
 	#WCS = @Z1_Heat_Request_Temp;									-- set initial Weather Compensation Setpoint to current @Z1_Heat_Request_Temp
 	if @Compressor_Freq > 18 then									-- set #CompState & #CompRunSec to values to indicate compressor is running during first boot
@@ -627,46 +625,38 @@ on timer=8 then
 end
 
 --[[
-**timer=9, PID funtion for TaShift**
-*Purpose*	: Calculate PID based offset for TaShift
-*Explanation*	: #PIDKp	= 2;			-- Proportional gain
-		#PIDKi		= 0.1;			-- Integral gain
-		#PIDKd		= 0.2;			-- Derivative gain
-*Result*	: #RoomTempControl & #RoomSetpointP
-*Called by*	: system#boot initially, setTimer(9,320) in function itselfs
+**timer=9, PI room correction for TaShift**
+*Purpose*: Calculate the living-room PI correction relative to the weather-compensated baseline (#WCS).
+*Explanation*: #RoomTempDelta is room temperature minus setpoint; the PI error has opposite sign.
+  Provisional gains Kp=1.2 and Ki=0.02 per five-minute sample, with no derivative.
+  Integrate only when aggregate heat demand, space-heating mode and room temperature allow room heat;
+  pause during DHW diversion and defrost. The +0.2C living-room threshold is a proxy for
+  room heat availability, not a direct zone-valve signal.
+  Hold integral across setpoint changes and inactive periods (bumpless integral handover).
+  Conditional integration uses the total PI output +/-5C; absolute integral limits remain +/-50.
+  At Ki=0.02 these correspond to at most +/-1C integral contribution. TaShift target limiting
+  is a separate unresolved issue and is not modified here.
+*Result*: #RoomTempControl
+*Called by*: Boot schedule, then every 300 seconds
 rule 13]]
 on timer=9 then
-	setTimer(9,300);										-- run this function every 5 minutes													
-	if #DHWRun < 1 then										-- 251008 only active if no #DHWRun
-		$RoomTempDelta = #RoomTempDelta * -1;
-		if (#RoomSetpoint > #RoomSetpointP && #RoomTempDelta < 0) ||
-			(#RoomSetpoint < #RoomSetpointP && #RoomTempDelta < -1) then			-- reset #PIDintegral with change of setpoint if RoomTempDelta is too far from 0.
-			#PIDintegral = 0;
-		else
-			#PIDintegral = min(max((#PIDintegral + $RoomTempDelta), -50), 50);		-- Integral term (sum of errors over time) limited to +/-5 impact on $PIDoutput
+	setTimer(9,300);						-- Execute PI every five minutes
+	$RoomError = #RoomTempDelta * -1;				-- Positive error means the living room is too cold
+	$PIp = 1.2 * $RoomError;					-- P correction to weather-compensation temperature
+	if #chEnable == 1 && #Heat == 1 && #DHWRun < 2 &&		-- Space heating is potentially available; DHWRun 1 permits space heating
+		@ThreeWay_Valve_State == 0 && @Defrosting_State == 0 &&	-- No DHW diversion or defrost
+		#RoomTempDelta <= 0.2 then				-- Living room not more than 0.2C too warm (availability proxy)
+		$PIintegralNext = min(max(#PIDintegral + $RoomError, -50), 50);	-- Absolute safety limit for accumulated room error
+		$PIcandidate = $PIp + 0.02 * $PIintegralNext;	-- PI output if this sample were integrated
+		if ($PIcandidate <= 5 || $RoomError <= 0) &&	-- Prevent further increase into upper output saturation
+			($PIcandidate >= -5 || $RoomError >= 0) then	-- Prevent further decrease into lower output saturation
+			#PIDintegral = $PIintegralNext;			-- Unwinding remains allowed
 		end
-		$PIDoutput = 3 * $RoomTempDelta + 0.1 * #PIDintegral +
-			0.2 * ($RoomTempDelta - #PIDpreverror);						-- Calculate the PID output 250203 added D control
-		if $RoomTempDelta == 0 || $RoomTempDelta > #PIDpreverror + 0.2 ||
-			$RoomTempDelta < #PIDpreverror - 0.2 then 					-- Update previous error for next derivative calculation
-			#PIDpreverror = $RoomTempDelta;
-		end	
-		#RoomTempControl = round($PIDoutput);
-		#RoomSetpointP = #RoomSetpoint;
 	end
+	$PIoutput = $PIp + 0.02 * #PIDintegral;		-- I is held rather than reset during setpoint changes or interruptions
+	#RoomTempControl = round(min(max($PIoutput, -5), 5));	-- Total PI output within +/-5C; TaShift still applies its own rules
 end
 
---[[
-**timer=10, Weather Compensation function**
-*Purpose*:	Calculate the #WCS based on outside temperature with possible Shift
-*Explanation*:	Heat loss is largly depending on the outside temperature but no full linear line is possible as Ta can't be too low (heating system can't provide enough heat 
-		to the rooms). The reason for not using the compensation curve from the HP is now #WCS is only calculated every 30 minutes and the TaShift function doesn't
-		cause an unwanted Compressor switch off. Most values for the calculation ($Ta1 = @Z1_Heat_Curve_Target_Low_Temp, $Tb1 = @Z1_Heat_Curve_Outside_High_Temp and 
-		$Tb2 = @Z1_Heat_Curve_Outside_Low_Temp are from Heat pump settings, $Ta2 must be set in rules as @Z1_Heat_Curve_Target_High_Temp will be set to calculated value in direct mode.
-		2512.08: $Ta2 changed from 34 to 36. Default values: 5 ⁰C: 30 ⁰C, -5 ⁰C: 36 ⁰C.
-*Result*:	#WCS, Weather Compensation Setpoint
-*Called by*:	system#boot initially, setTimer(10,1800) in function itselfs
-rule 14]]
 on timer=10 then
 	setTimer(10,1800);											-- run this rule every half hour
 --	$Ta1 = @Z1_Heat_Curve_Target_Low_Temp; $Tb1 = @Z1_Heat_Curve_Outside_High_Temp;$Tb2 = @Z1_Heat_Curve_Outside_Low_Temp; $Ta2 = 36;
