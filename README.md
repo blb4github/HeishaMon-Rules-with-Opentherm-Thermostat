@@ -2,7 +2,7 @@
 
 These are the rules I use to control a Panasonic heat pump with an OpenTherm thermostat. They are tailored to my installation; use them as inspiration and adapt the settings and integration to your own system.
 
-## Current version: 2611.01 (review candidate)
+## Current version: 2611.02 (review candidate) (review candidate)
 
 See [CHANGELOG.md](CHANGELOG.md) for the changes in each published version.
 
@@ -100,3 +100,7 @@ For edits, work in `HeishaMon_Rules_BlB4_commented.lua`, then generate the ready
 Thanks to [HeishaMon](https://github.com/Egyras/HeishaMon), [@CurlyMoo](https://github.com/CurlyMoo) for the rules functionality and [@fbloemhof](https://github.com/fbloemhof) for the documentation inspiration.
 
 Licensed under the [MIT License](LICENSE).
+
+### TaShift in 2611.02 (review candidate)
+
+TaShift now treats the room PI correction as the normal heating-target offset during sustained compressor operation. Existing startup, DHW/defrost, compressor-off hysteresis, shift limits and explicit Z2 override remain, but outlet overshoot safeguards can only raise the target rather than erase a positive PI request. For night setback, compressor-off target suppression no longer applies while the room is cold AND heating demand is present. This is a draft change, **not field-tested**. See [TaShift design review](docs/TA-SHIFT-2611-02-REVIEW.md).
