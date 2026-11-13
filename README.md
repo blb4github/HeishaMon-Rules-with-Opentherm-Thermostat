@@ -2,7 +2,7 @@
 
 These are the rules I use to control a Panasonic heat pump with an OpenTherm thermostat. They are tailored to my installation; use them as inspiration and adapt the settings and integration to your own system.
 
-## Current version: 2610.09 (review candidate)
+## Current version: 2611.01 (review candidate)
 
 See [CHANGELOG.md](CHANGELOG.md) for the changes in each published version.
 
