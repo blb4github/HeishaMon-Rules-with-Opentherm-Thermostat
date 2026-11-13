@@ -1,23 +1,8 @@
 # Changelog
 
-## 2611.02 — draft for review (2026-11-13, not field-tested)
-
-**Reconcile TaShift with the room PI from 2611.01 without introducing another PI damper or control timer.**
-
-- Calculate the effective weather baseline `$WCS` in every TaShift call, not only with compressor running.
-- During steady compressor operation, use the larger of (a) the requested room PI offset and (b) the outlet overshoot protection floor `ceil(outlet-1.9-$WCS)`. This lets PI set the actual heating target while preventing a target more than about 2C below outlet where possible.
-- Remove the low-frequency branch which could hold a stale `#SHifT`; allow downward PI corrections as the room reaches its setpoint.
-- Convert both `#TaDeltaTimer >=80` and `#TaDelta >=3` emergency shifts from unconditional assignments to `max()` lower-bound protection, so they can no longer erase room PI demand.
-- Remove the permanent outlet-based **upper** cap on `#Z1HRT` that was responsible for the 2026-11-12 28-30C targets despite a positive PI request.
-- When the compressor is idle, allow PI to determine the target if heat is requested and the existing anti-cycle conditions do not suppress it. Overnight -5C suppression remains when no demand is present or the room is not below setpoint; a cold room with active demand can therefore recover before 07:00.
-- Keep unchanged: original >7C/first-130s soft-start exception, outlet-event guard, defrost/DHW eligibility, +/-5C shift limit, compressor-off hysteresis, zone 2 request override, and timer 9 PI gains/state.
-
-**Counterfactual (12 Nov 2026):** with the actual old room/outlet measurements and the new PI replay, target ~33C at 09:02 (old 28C), ~32C at 13:32 (old 30C). This is not a physical thermal forecast. Validate startup, post-defrost, low-frequency operation and overnight recovery on live hardware before deployment.
-
-
 ## 2611.01 — review candidate (2026-11-13; not field-tested)
 
-**Improve timer 9 only: PI room correction, with no TaShift changes.**
+**Combined PI (timer 9) and TaShift update, prepared as one release before initial deployment.**
 
 - Reduce provisional gains to P=1.2 and I=0.02 per five-minute cycle (formerly P=3, I=0.1); remove D.
 - Preserve the integral across ordinary setpoint changes; P still responds immediately.
@@ -26,7 +11,14 @@
 - Conditional integration prevents additional I accumulation when the **candidate total PI output** exceeds ±5°C; integration in the opposite direction remains possible. Keep absolute integral limits ±50; with I=0.02 they represent at most ±1°C integral contribution.
 - Clamp `#RoomTempControl` to ±5°C. Remove obsolete `#PIDpreverror` and `#RoomSetpointP` state variables.
 - Offline replay of the 240 five-minute cycles from 2026-11-12: proposed PI ~+2°C at 09:02, 13:32 and 15:02 versus old PID +7/+8/+7°C. This holds the historical room-temperature series fixed and is **not a closed-loop physical forecast**.
-- **Deliberately unchanged:** TaShift still has its outlet-dependent cap that prevented positive PID corrections from reaching the heat-pump target on 2026-11-12. Requires separate review before deployment.
+- **TaShift included in the same release:** compute effective weather baseline on each call; when the compressor runs normally, honor room PI while keeping the outlet-overshoot target floor. Remove the low-frequency hold that could retain an outdated #SHifT.
+- Convert TaDelta and TaDeltaTimer emergency corrections into max() lower-bound safeguards, instead of overriding a positive PI correction.
+- Remove the persistent outlet-dependent upper limit on #Z1HRT that previously held the target at 28-30C despite a positive room PI request.
+- During compressor idle periods, honor room PI if heat is requested and the existing anti-cycle conditions allow; retain nighttime -5C suppression if the living room is not cold or heating demand is absent.
+- Preserve the existing first-130-second high-outside-temperature soft-start exception, ±5C shift limit, defrost/DHW guards and explicit Zone 2 override. TaShift does not add another PI damper or timer.
+- Open-loop counterfactual for 12 November: at 09:02 a candidate target of about 33C (old 28C); at 13:32 about 32C (old 30C). Actual room temperatures and compressor response under the new rules remain untested.
+- See [TaShift design review](docs/TA-SHIFT-2611-01-REVIEW.md) for assumptions and test scenarios.
+
 
 ## 2610.08 — 2026-10-30
 
