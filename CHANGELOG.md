@@ -1,5 +1,20 @@
 # Changelog
 
+## 2611.02 — draft for review (2026-11-13, not field-tested)
+
+**Reconcile TaShift with the room PI from 2611.01 without introducing another PI damper or control timer.**
+
+- Calculate the effective weather baseline `$WCS` in every TaShift call, not only with compressor running.
+- During steady compressor operation, use the larger of (a) the requested room PI offset and (b) the outlet overshoot protection floor `ceil(outlet-1.9-$WCS)`. This lets PI set the actual heating target while preventing a target more than about 2C below outlet where possible.
+- Remove the low-frequency branch which could hold a stale `#SHifT`; allow downward PI corrections as the room reaches its setpoint.
+- Convert both `#TaDeltaTimer >=80` and `#TaDelta >=3` emergency shifts from unconditional assignments to `max()` lower-bound protection, so they can no longer erase room PI demand.
+- Remove the permanent outlet-based **upper** cap on `#Z1HRT` that was responsible for the 2026-11-12 28-30C targets despite a positive PI request.
+- When the compressor is idle, allow PI to determine the target if heat is requested and the existing anti-cycle conditions do not suppress it. Overnight -5C suppression remains when no demand is present or the room is not below setpoint; a cold room with active demand can therefore recover before 07:00.
+- Keep unchanged: original >7C/first-130s soft-start exception, outlet-event guard, defrost/DHW eligibility, +/-5C shift limit, compressor-off hysteresis, zone 2 request override, and timer 9 PI gains/state.
+
+**Counterfactual (12 Nov 2026):** with the actual old room/outlet measurements and the new PI replay, target ~33C at 09:02 (old 28C), ~32C at 13:32 (old 30C). This is not a physical thermal forecast. Validate startup, post-defrost, low-frequency operation and overnight recovery on live hardware before deployment.
+
+
 ## 2611.01 — review candidate (2026-11-13; not field-tested)
 
 **Improve timer 9 only: PI room correction, with no TaShift changes.**
