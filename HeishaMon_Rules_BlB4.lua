@@ -1,5 +1,5 @@
 on System#Boot then
-	print('BLB Heishamon_rules_2611.02.lua');
+	print('BLB Heishamon_rules_2611.01.lua');
 	#chEnableOnMin = -1;
 	#chEnableChangeTime = -1;
 	#chEnableTimeOff = -1;
