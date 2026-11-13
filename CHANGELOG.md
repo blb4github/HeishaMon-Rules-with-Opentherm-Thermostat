@@ -1,3 +1,5 @@
+# Changelog
+
 ## 2610.09 — review candidate (2026-11-13; not field-tested)
 
 **Improve timer 9 only: PI room correction, with no TaShift changes.**
@@ -10,8 +12,6 @@
 - Clamp `#RoomTempControl` to ±5°C. Remove obsolete `#PIDpreverror` and `#RoomSetpointP` state variables.
 - Offline replay of the 240 five-minute cycles from 2026-11-12: proposed PI ~+2°C at 09:02, 13:32 and 15:02 versus old PID +7/+8/+7°C. This holds the historical room-temperature series fixed and is **not a closed-loop physical forecast**.
 - **Deliberately unchanged:** TaShift still has its outlet-dependent cap that prevented positive PID corrections from reaching the heat-pump target on 2026-11-12. Requires separate review before deployment.
-
-# Changelog
 
 ## 2610.08 — 2026-10-30
 
