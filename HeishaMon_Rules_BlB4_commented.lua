@@ -225,15 +225,20 @@ on @Compressor_Freq then
 end
 
 --[[
-**timer=3 & @Main_Outlet_Temp, TaSHifT (Target Temp Manipulations)**
-*Purpose*:	1) lower Target Temp to softstart the compressor run when heat loss < minimum power HP, 2) extend compressor runtime by SHifTing HRT (Heat Request Temperature) if To (Temp Outlet) is higher than HRT,
-		3) Adapt HRT as result of RoomTempDiff and 4) switch off compressor under certain conditions (e.g. roomtemperature too high) by SHifTing Target Temp maximum down.
-*Explanation*:	at a certain (high) outside Temperature the minimum power of the HP is higher than the heat lost and as a result the compressor will switch off if To > HRT + 2 degrees.
-		This can lead to short compressor run times and the purpose of this function is to extend the runtime by SHifTing the Target Temp up. The maximum SHifT is based on outside temperature and below
-		a certain outside temperature (<=9 degrees) the SHifT will not be set (as not required). 2510.18 added logic based on @Main_Outlet_Temp trigger to prevent Compressor switch off at the start of 
-		the run due to too high temperature delta.
-*Result*:	@SetZ1HeatRequestTemperature set to required value
-*Called by*:	System#Boot initially, setTimer(3,30) in function itselfs
+**timer=3 & @Main_Outlet_Temp, TaShift (heating-target calculation)**
+*Purpose*: Calculate the zone 1 heat request using weather compensation and the living-room PI, with
+  conditional protection against premature compressor shutdown from outlet temperature overshoot.
+*Explanation*: With the compressor running, the normal shift is the greater of (a) the room PI request
+  and (b) the shift needed to keep outlet approximately within 2C above the heating target. The
+  existing outlet-delta timer is a lower-bound safeguard and must never replace a higher PI request.
+  During the first 130 seconds above 7C outside, the original soft-start exception still applies.
+  When the compressor is idle, the existing overnight and anti-cycle suppression remains for a
+  warm room or absent heat demand; if the room is cold and heating is requested, PI can determine
+  the target. The shift is clipped to +/-5C; an explicit zone 2 request >25C still overrides zone 1.
+  The former running-compressor outlet-based upper target cap was removed in 2611.02 because
+  it could suppress PI comfort demand for hours even with the room substantially below setpoint.
+*Result*: @SetZ1HeatRequestTemperature when the requested zone 1 target changes.
+*Called by*: @Main_Outlet_Temp event and timer 3
 rule 05, 06 & 07]]
 
 on @Main_Outlet_Temp then
