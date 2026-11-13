@@ -1,5 +1,5 @@
 on System#Boot then
-	print('BLB Heishamon_rules_2611.01.lua');
+	print('BLB Heishamon_rules_2611.02.lua');
 	#chEnableOnMin = -1;
 	#chEnableChangeTime = -1;
 	#chEnableTimeOff = -1;
@@ -98,42 +98,38 @@ end
 on TaShift then
 	#NoDefrost = @Defrosting_State == 0 || (@Pump_Flow > 5 && @Pump_Flow < 30);
 	if #Heat == 1 && @ThreeWay_Valve_State == 0 && #DHWRun < 2 && #NoDefrost == 1 then
+		$WCS = #WCS + min(max(@Z2_Heat_Request_Temp - 20,-5), 5);
 		if #CompState > 0 then
-			$WCS = #WCS + min(max(@Z2_Heat_Request_Temp - 20,-5), 5);
 			#TaDelta = @Main_Outlet_Temp - @Z1_Heat_Request_Temp;
 			if #OutsideTemp > 7 && #CompRunSec < 130 && #CompRunSec != -1 then
 				#SHifT = ceil(@Main_Outlet_Temp) - 3 - $WCS;
-			elseif @Compressor_Freq < 21 && max(#RoomTempControl,
-				ceil(@Main_Outlet_Temp - 1.9 - $WCS)) < #SHifT then
-				print('no #SHifT required');
 			else
-				#SHifT = max(#RoomTempControl,ceil(@Main_Outlet_Temp - 1.9 - $WCS));
-			end 
+				#SHifT = max(#RoomTempControl, ceil(@Main_Outlet_Temp - 1.9 - $WCS));
+			end
 			if #TaDelta < 2 then
 				#TaDeltaTimer = 0;
 			elseif #TaDeltaTimer == 0 then
 				#TaDeltaTimer = 10;
 				setTimer(12,10);
 			elseif #TaDeltaTimer >= 80 then
-				#SHifT = ceil(@Main_Outlet_Temp - 1.8 - $WCS);
-
+				#SHifT = max(#SHifT, ceil(@Main_Outlet_Temp - 1.8 - $WCS));
 			end
 			if #TaDelta >= 3 then
-				#SHifT = ceil(@Main_Outlet_Temp) - 2 - $WCS;
+				#SHifT = max(#SHifT, ceil(@Main_Outlet_Temp) - 2 - $WCS);
 			end
-
-		elseif (%hour < 7 || %hour > 22 || #RoomTempDelta > 0.2) then
+		elseif ((%hour < 7 || %hour > 22) && (#RoomTempDelta >= 0 || #chEnable == 0)) ||
+			#RoomTempDelta > 0.2 then
 			#SHifT = -5;
 		elseif #CompRunMin > (-2 * #OutsideTemp - 30) && (#RoomTempDelta > 0.1 || (#RoomTempDelta > 0 && #SHifT == -5)) then
 			#SHifT = -5;
 		else
 			#SHifT = 0;
+			if #chEnable == 1 then
+				#SHifT = #RoomTempControl;
+			end
 		end
 		#SHifT = min(max(#SHifT, -5), 5);
-		#Z1HRT = coalesce($WCS, #WCS) + #SHifT;
-		if #CompState > 0 then
-			#Z1HRT = min(#Z1HRT, max($WCS - 5, ceil(@Main_Outlet_Temp) - 1));
-		end
+		#Z1HRT = $WCS + #SHifT;
 		if @Z2_Heat_Request_Temp > 25 then
 			#Z1HRT = @Z2_Heat_Request_Temp;
 		end
