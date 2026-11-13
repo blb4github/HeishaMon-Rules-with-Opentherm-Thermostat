@@ -2,7 +2,7 @@
 
 These are the rules I use to control a Panasonic heat pump with an OpenTherm thermostat. They are tailored to my installation; use them as inspiration and adapt the settings and integration to your own system.
 
-## Current version: 2611.02 (review candidate)
+## Current version: 2611.01 (review candidate)
 
 See [CHANGELOG.md](CHANGELOG.md) for the changes in each published version.
 
@@ -34,9 +34,9 @@ The `.lua` extension is a filename convention: these files use the **HeishaMon r
 7. Control cooling using Home Assistant/OpenTherm enable and water-temperature requests.
 8. Handle the weekly clock rollover in compressor and thermostat elapsed-time calculations.
 
-### TaShift in 2611.02 (review candidate)
+### TaShift improvements included in 2611.01
 
-TaShift now treats the room PI correction as the normal heating-target offset during sustained compressor operation. Existing startup, DHW/defrost, compressor-off hysteresis, shift limits and explicit Z2 override remain, but outlet overshoot safeguards can only raise the target rather than erase a positive PI request. For night setback, compressor-off target suppression no longer applies while the room is cold AND heating demand is present. This is a draft change, **not field-tested**. See [TaShift design review](docs/TA-SHIFT-2611-02-REVIEW.md).
+TaShift now treats the room PI correction as the normal heating-target offset during sustained compressor operation. Existing startup, DHW/defrost, compressor-off hysteresis, shift limits and explicit Z2 override remain, but outlet overshoot safeguards can only raise the target rather than erase a positive PI request. For night setback, compressor-off target suppression no longer applies while the room is cold AND heating demand is present. This is a draft change, **not field-tested**. See [TaShift design review](docs/TA-SHIFT-2611-01-REVIEW.md).
 
 ## OpenTherm room values
 
