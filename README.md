@@ -34,6 +34,10 @@ The `.lua` extension is a filename convention: these files use the **HeishaMon r
 7. Control cooling using Home Assistant/OpenTherm enable and water-temperature requests.
 8. Handle the weekly clock rollover in compressor and thermostat elapsed-time calculations.
 
+### TaShift improvements included in 2611.01
+
+TaShift now treats the room PI correction as the normal heating-target offset during sustained compressor operation. Existing startup, DHW/defrost, compressor-off hysteresis, shift limits and explicit Z2 override remain, but outlet overshoot safeguards can only raise the target rather than erase a positive PI request. For night setback, compressor-off target suppression no longer applies while the room is cold AND heating demand is present. This is a draft change, **not field-tested**. See [TaShift design review](docs/TA-SHIFT-2611-01-REVIEW.md).
+
 ## OpenTherm room values
 
 The room setpoint and current room temperature are transported as their normal OpenTherm values instead of encoding room temperature in `maxRelativeModulation`.
