@@ -1,5 +1,5 @@
 on System#Boot then
-	print('BLB Heishamon_rules_2610.08.lua');
+	print('BLB Heishamon_rules_2610.09.lua');
 	#chEnableOnMin = -1;
 	#chEnableChangeTime = -1;
 	#chEnableTimeOff = -1;
@@ -14,7 +14,6 @@ on System#Boot then
 	#Heat = -1;
 	#OMP = -1;
 	#QMR = -1;
-	#PIDpreverror = 0;
 	#PIDintegral = 0;
 	#RoomTempDelta = 0;
 	#RoomTempControl = 0;
@@ -39,7 +38,6 @@ on timer=1 then
 	#OMR = @Operating_Mode_State;
 	#OutsideTemp = @Outside_Temp;
 	#RoomSetpoint = min(max(?roomTempSet, 10), 22);
-	#RoomSetpointP = #RoomSetpoint;
 	#RoomTemp = ?roomTemp;
 	#WCS = @Z1_Heat_Request_Temp;
 	if @Compressor_Freq > 18 then
@@ -374,20 +372,20 @@ end
 
 on timer=9 then
 	setTimer(9,300);
-	if #DHWRun < 1 then
-		$RoomTempDelta = #RoomTempDelta * -1;
-		if (#RoomSetpoint > #RoomSetpointP && #RoomTempDelta < 0) || (#RoomSetpoint < #RoomSetpointP && #RoomTempDelta < -1) then
-			#PIDintegral = 0;
-		else
-			#PIDintegral = min(max((#PIDintegral + $RoomTempDelta), -50), 50);
+	$RoomError = #RoomTempDelta * -1;
+	$PIp = 1.2 * $RoomError;
+	if #chEnable == 1 && #Heat == 1 && #DHWRun < 2 &&
+		@ThreeWay_Valve_State == 0 && @Defrosting_State == 0 &&
+		#RoomTempDelta <= 0.2 then
+		$PIintegralNext = min(max(#PIDintegral + $RoomError, -50), 50);
+		$PIcandidate = $PIp + 0.02 * $PIintegralNext;
+		if ($PIcandidate <= 5 || $RoomError <= 0) &&
+			($PIcandidate >= -5 || $RoomError >= 0) then
+			#PIDintegral = $PIintegralNext;
 		end
-		$PIDoutput = 3 * $RoomTempDelta + 0.1 * #PIDintegral + 0.2 * ($RoomTempDelta - #PIDpreverror);
-		if $RoomTempDelta == 0 || $RoomTempDelta > #PIDpreverror + 0.2 || $RoomTempDelta < #PIDpreverror - 0.2 then
-			#PIDpreverror = $RoomTempDelta;
-		end	
-		#RoomTempControl = round($PIDoutput);
-		#RoomSetpointP = #RoomSetpoint;
 	end
+	$PIoutput = $PIp + 0.02 * #PIDintegral;
+	#RoomTempControl = round(min(max($PIoutput, -5), 5));
 end
 
 on timer=10 then
