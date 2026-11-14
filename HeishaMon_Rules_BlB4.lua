@@ -143,17 +143,10 @@ on TaShift then
 			if #TaPIStepTime >= 0 then
 				#Z1HRT = @Z1_Heat_Request_Temp;
 			end
-			if (#OutsideTemp <= 7 || #CompRunSec >= 130 || #CompRunSec == -1) &&
-				((#TaPIStepTime < 0 &&
-					(#CompRunMin >= 15 || (#CompRunMin >= 2 && @Compressor_Freq <= #CompFreqTarget))) ||
-				(#TaPIStepTime >= 0 &&
-					((#Time - #TaPIStepTime + 10080) % 10080 >= 15 ||
-					((#Time - #TaPIStepTime + 10080) % 10080 >= 2 &&
-					@Compressor_Freq <= #CompFreqTarget)))) then
+			if (#OutsideTemp <= 7 || #CompRunSec >= 130 || #CompRunSec == -1) && ((#TaPIStepTime < 0 && (#CompRunMin >= 15 || (#CompRunMin >= 2 && @Compressor_Freq <= #CompFreqTarget))) || (#TaPIStepTime >= 0 && ((#Time - #TaPIStepTime + 10080) % 10080 >= 15 || ((#Time - #TaPIStepTime + 10080) % 10080 >= 2 && @Compressor_Freq <= #CompFreqTarget)))) then
 				if $WCS + #RoomTempControl > @Z1_Heat_Request_Temp then
 					#Z1HRT = min(@Z1_Heat_Request_Temp + 1, $WCS + #RoomTempControl);
-				elseif $WCS + #RoomTempControl < @Z1_Heat_Request_Temp &&
-					@Main_Outlet_Temp <= @Z1_Heat_Request_Temp + 0.8 then
+				elseif $WCS + #RoomTempControl < @Z1_Heat_Request_Temp && @Main_Outlet_Temp <= @Z1_Heat_Request_Temp + 0.8 then
 					#Z1HRT = max(@Z1_Heat_Request_Temp - 1, $WCS + #RoomTempControl);
 				else
 					#Z1HRT = @Z1_Heat_Request_Temp;
