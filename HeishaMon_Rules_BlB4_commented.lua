@@ -231,19 +231,29 @@ on @Compressor_Freq then
 end
 
 --[[
-**TaShift 2611.05 — 2610.08 restart/defrost, PI handover from 2611.01**
-Preserve original startup, compressor-outlet protection, compressor-off conditions,
-defrost/flow gating and explicit Zone 2 override. PI remains unchanged in timer 9.
-During heating (not defrost), release startup when @Compressor_Freq <= #CompFreqTarget
-or #CompRunMin >= 15. Each 1 C transfer step resets its own 15-minute timeout.
-For subsequent frequency-based releases, require at least two #Time minute ticks
-after the previous step, to observe a compressor response.
-Never decrease a target 1 C if that would leave >1.8 C outlet overshoot.
-The existing #TaDelta / #TaDeltaTimer emergency protections can independently raise
-the target by 1 C to discourage premature compressor shutdown.
-The original Z2 direct request >25C remains an explicit exception.
-#Time is the established week-minute counter; no dependency on experimental %time.
+**timer=3 & @Main_Outlet_Temp, TaSHifT (Target Temp Manipulations)**
+*Purpose*:	1) lower Target Temp to softstart the compressor run when heat loss < minimum power HP, 2) extend compressor runtime by SHifTing HRT (Heat Request Temperature) if To (Temp Outlet) is higher than HRT,
+		3) Adapt HRT as result of RoomTempDiff and 4) switch off compressor under certain conditions (e.g. roomtemperature too high) by SHifTing Target Temp maximum down.
+*Explanation*:	at a certain (high) outside Temperature the minimum power of the HP is higher than the heat lost and as a result the compressor will switch off if To > HRT + 2 degrees.
+		This can lead to short compressor run times and the purpose of this function is to extend the runtime by SHifTing the Target Temp up. The maximum SHifT is based on outside temperature and below
+		a certain outside temperature (<=9 degrees) the SHifT will not be set (as not required). 2510.18 added logic based on @Main_Outlet_Temp trigger to prevent Compressor switch off at the start of 
+		the run due to too high temperature delta.
+*Result*:	@SetZ1HeatRequestTemperature set to required value
+*Called by*:	System#Boot initially, setTimer(3,30) in function itselfs
+rule 05, 06 & 07]]
+
+--[[
+**2611.05 addition to the original 2610.08 TaShift**
+The original 2610.08 commented code is preserved line-for-line except for insertion of:
+(a) reset of #TaPIPhase on defrost, and
+(b) the controlled transfer block after the legacy compressor-running target cap.
+The 2611.01 PI calculation in timer=9 remains entirely unchanged.
+Each PI target step is +1/-1 C, approved by compressor frequency <= #CompFreqTarget
+after a short observation interval, or by a NEW 15-minute timeout for EACH step.
+The existing #Time minute counter is used: no dependency on experimental %time.
+Protective outlet-based target increases and direct Z2 requests remain exceptions.
 ]]
+
 on @Main_Outlet_Temp then
 	if isset(#Time) then										-- 2610.07 added check to prevent TaShift() before Rules are properly initiated by on timer=1
 		TaShift();
@@ -260,91 +270,97 @@ on timer=3 then
 end
 
 on TaShift then
-	if @Defrosting_State == 1 then
+	if @Defrosting_State == 1 then					-- Defrost begins/continues: preserve original TaShift logic; restart controlled PI transfer after defrost
 		#TaPIPhase = 0;
 	end
-	#NoDefrost = @Defrosting_State == 0 || (@Pump_Flow > 5 && @Pump_Flow < 30);
-	if #Heat == 1 && @ThreeWay_Valve_State == 0 && #DHWRun < 2 && #NoDefrost == 1 then
-		if #CompState > 0 then
-			$WCS = #WCS + min(max(@Z2_Heat_Request_Temp - 20,-5), 5);
-			#TaDelta = @Main_Outlet_Temp - @Z1_Heat_Request_Temp;
-			if #OutsideTemp > 7 && #CompRunSec < 130 && #CompRunSec != -1 then
-				#SHifT = ceil(@Main_Outlet_Temp) - 3 - $WCS;
+	#NoDefrost = @Defrosting_State == 0 || (@Pump_Flow > 5 && @Pump_Flow < 30);			-- define NoDefrost to avoid TaShift during defrost or when flow is too low (during defrost)
+	if #Heat == 1 && @ThreeWay_Valve_State == 0 && #DHWRun < 2 && #NoDefrost == 1 then		-- TaShift only required during certain conditions
+		if #CompState > 0 then									-- Compressor is running
+		--	$WCS = #WCS;									-- default WCS to current WCS
+		--	if @Z2_Heat_Request_Temp < 26 then
+			$WCS = #WCS + min(max(@Z2_Heat_Request_Temp - 20,-5), 5);			-- Adjust Weather Compensation Setpoint based on override Z2 Heat Request Temp, with a maximum shift of -5 to +5 degrees
+		--	end
+			#TaDelta = @Main_Outlet_Temp - @Z1_Heat_Request_Temp;				-- Delta between Main Outlet Temp and Heat Request Temp
+			if #OutsideTemp > 7 && #CompRunSec < 130 && #CompRunSec != -1 then		-- 2603.07 changed #CompRunSec < 150 to #CompRunSec < 130
+				#SHifT = ceil(@Main_Outlet_Temp) - 3 - $WCS;				-- set SHifT to lower value if outside temperature is high and during first 3 minutes of compressor run to prevent early switch off due to too high To > HRT delta
 			elseif @Compressor_Freq < 21 && max(#RoomTempControl,
-				ceil(@Main_Outlet_Temp - 1.9 - $WCS)) < #SHifT then
+				ceil(@Main_Outlet_Temp - 1.9 - $WCS)) < #SHifT then			-- 2603.11 added this logic to avoid changes is not required
 				print('no #SHifT required');
 			else
-				#SHifT = max(#RoomTempControl,ceil(@Main_Outlet_Temp - 1.9 - $WCS));
+				#SHifT = max(#RoomTempControl,ceil(@Main_Outlet_Temp - 1.9 - $WCS));	-- default SHifT to RoomTempControl, which is based on RoomTempDelta and will be calculated in the PID function (see rule on timer=9). Safeguard to make sure Ta is not going >=2 above setpoint.
 			end 
-			if #TaDelta < 2 then
-				#TaDeltaTimer = 0;
+			if #TaDelta < 2 then								-- safeguard: increase #ShifT if #TaDelta > 2 degrees for too long to prevent compressor switch off
+				#TaDeltaTimer = 0;							-- reset TaDeltaTimer if delta < 2 degrees
 			elseif #TaDeltaTimer == 0 then
-				#TaDeltaTimer = 10;
-				setTimer(12,10);
-			elseif #TaDeltaTimer >= 80 then
-				#SHifT = ceil(@Main_Outlet_Temp - 1.8 - $WCS);
-
+				#TaDeltaTimer = 10;							-- 2603.03 added this line to prevent restarting timer 12 multiple times 
+				setTimer(12,10);							-- start timer=12 to accumulate TaDeltaTimer time
+			elseif #TaDeltaTimer >= 80 then							-- only increase SHifT if TaDeltaTimer > 80 seconds
+				#SHifT = ceil(@Main_Outlet_Temp - 1.8 - $WCS);				-- calculate required SHifT based on Main Outlet Temp and Weather Compensation Setpoint
+--[[				if #Debug > 0 then
+					print('$WCS: ', $WCS, ' #SHifT: ', #SHifT);
+				end]]
 			end
-			if #TaDelta >= 3 then
+			if #TaDelta >= 3 then								-- 2610.02 taken out ($WCS + #SHifT - @Main_Outlet_Temp >=3) again to improve start up logic
 				#SHifT = ceil(@Main_Outlet_Temp) - 2 - $WCS;
 			end
 
-		elseif (%hour < 7 || %hour > 22 || #RoomTempDelta > 0.2) then
+		elseif (%hour < 7 || %hour > 22 || #RoomTempDelta > 0.2) then				-- compressor is off for a relative short time (depending on outside temperature) and #RoomTempDelta <= 0, SHifT to -5 to avoid short cycle. 603.04 added && #RoomTempDelta > 0
 			#SHifT = -5;
-		elseif #CompRunMin > (-2 * #OutsideTemp - 30) && (#RoomTempDelta > 0.1 || (#RoomTempDelta > 0 && #SHifT == -5)) then
+		elseif #CompRunMin > (-2 * #OutsideTemp - 30) && 					-- Compressor is not running. 
+			(#RoomTempDelta > 0.1 || (#RoomTempDelta > 0 && #SHifT == -5)) then		-- 2610.04 added hysteresis
 			#SHifT = -5;
 		else
-			#SHifT = 0;
+			#SHifT = 0;									-- default SHifT to 0 if compressor is off for a longer time and room temperature isn't too high
 		end
-		#SHifT = min(max(#SHifT, -5), 5);
-		#Z1HRT = coalesce($WCS, #WCS) + #SHifT;
-		if #CompState > 0 then
+		#SHifT = min(max(#SHifT, -5), 5);							-- keep #SHifT in the range -5 to +5
+		#Z1HRT = coalesce($WCS, #WCS) + #SHifT;							-- 2603.06 added coalesce to have correct #Z1HRT if #Compressor isn't running
+		if #CompState > 0 then									-- 2610.02 improved ramp up logic
 			#Z1HRT = min(#Z1HRT, max($WCS - 5, ceil(@Main_Outlet_Temp) - 1));
 		end
-		if #CompState > 0 && @Defrosting_State == 0 && @Z2_Heat_Request_Temp <= 25 then
-			$PIWanted = $WCS + #RoomTempControl;
-			$StepElapsed = #CompRunMin;
-			if #TaPIPhase == 1 then
-				$StepElapsed = (#Time - #TaPIStepTime + 10080) % 10080;
-				#Z1HRT = @Z1_Heat_Request_Temp;
+		if #CompState > 0 && @Defrosting_State == 0 && @Z2_Heat_Request_Temp <= 25 then		-- PI transfer only during space heating, not during defrost or a direct Z2 target override
+			$PIWanted = $WCS + #RoomTempControl;		-- WAR/PI only defines desired target; no compressor constraints in the PI itself
+			$StepElapsed = #CompRunMin;		-- phase 0: use elapsed time since compressor start for first release
+			if #TaPIPhase == 1 then		-- phase 1: each PI step has its own independent release timer
+				$StepElapsed = (#Time - #TaPIStepTime + 10080) % 10080;		-- elapsed minutes since last accepted PI step; includes weekly clock rollover
+				#Z1HRT = @Z1_Heat_Request_Temp;		-- hold actual current target while awaiting release, to avoid unsolicited target jumps
 			end
-			$OriginalSoftStart = #OutsideTemp > 7 && #CompRunSec < 130 && #CompRunSec != -1;
+			$OriginalSoftStart = #OutsideTemp > 7 && #CompRunSec < 130 && #CompRunSec != -1;		-- do not override the original first-130-second soft start above 7 C
 			if $OriginalSoftStart == 0 &&
-				($StepElapsed >= 15 || ($StepElapsed >= 2 && @Compressor_Freq <= #CompFreqTarget)) then
-				if #TaPIPhase == 0 then
-					#TaPIStepTime = #Time;
+				($StepElapsed >= 15 || ($StepElapsed >= 2 && @Compressor_Freq <= #CompFreqTarget)) then		-- allow one step on low frequency after observation, or after a fresh 15-minute escape
+				if #TaPIPhase == 0 then		-- first successful release switches from legacy startup to PI transfer
+					#TaPIStepTime = #Time;		-- time reference for next response-dependent PI step
 				end
-				#TaPIPhase = 1;
-				if $PIWanted > @Z1_Heat_Request_Temp then
-					#Z1HRT = min(@Z1_Heat_Request_Temp + 1, $PIWanted);
-				elseif $PIWanted < @Z1_Heat_Request_Temp &&
+				#TaPIPhase = 1;		-- stay in PI-transfer mode until compressor stop or defrost
+				if $PIWanted > @Z1_Heat_Request_Temp then		-- approach the desired target in +1 C steps
+					#Z1HRT = min(@Z1_Heat_Request_Temp + 1, $PIWanted);		-- never increase by more than 1 C per authorized PI step
+				elseif $PIWanted < @Z1_Heat_Request_Temp &&		-- only lower target if there is headroom to the compressor-off temperature condition
 					@Main_Outlet_Temp <= @Z1_Heat_Request_Temp + 0.8 then
-					#Z1HRT = max(@Z1_Heat_Request_Temp - 1, $PIWanted);
+					#Z1HRT = max(@Z1_Heat_Request_Temp - 1, $PIWanted);		-- never decrease by more than 1 C per authorized PI step
 				else
-					#Z1HRT = @Z1_Heat_Request_Temp;
+					#Z1HRT = @Z1_Heat_Request_Temp;		-- hold actual current target while awaiting release, to avoid unsolicited target jumps
 				end
-				if #Z1HRT != @Z1_Heat_Request_Temp then
-					#TaPIStepTime = #Time;
+				if #Z1HRT != @Z1_Heat_Request_Temp then		-- restart step-escape clock only when the target actually changes
+					#TaPIStepTime = #Time;		-- time reference for next response-dependent PI step
 				end
 			end
-			if #TaPIPhase == 1 then
-				$SafeTarget = @Z1_Heat_Request_Temp;
-				if #TaDeltaTimer >= 80 then
+			if #TaPIPhase == 1 then		-- phase 1: each PI step has its own independent release timer
+				$SafeTarget = @Z1_Heat_Request_Temp;		-- minimum target required for safe operation (before emergency conditions)
+				if #TaDeltaTimer >= 80 then		-- original prolonged outlet overshoot condition
 					$SafeTarget = max($SafeTarget, ceil(@Main_Outlet_Temp - 1.8));
 				end
-				if #TaDelta >= 3 then
+				if #TaDelta >= 3 then		-- original immediate excessive outlet overshoot condition
 					$SafeTarget = max($SafeTarget, ceil(@Main_Outlet_Temp) - 2);
 				end
-				if $SafeTarget > @Z1_Heat_Request_Temp && $SafeTarget > #Z1HRT then
-					#Z1HRT = min(@Z1_Heat_Request_Temp + 1, $SafeTarget);
-					#TaPIStepTime = #Time;
+				if $SafeTarget > @Z1_Heat_Request_Temp && $SafeTarget > #Z1HRT then		-- emergency correction only if actual outlet overshoot requires raising target
+					#Z1HRT = min(@Z1_Heat_Request_Temp + 1, $SafeTarget);		-- safety correction limited to +1 C per call
+					#TaPIStepTime = #Time;		-- time reference for next response-dependent PI step
 				end
 			end
 		end
-		if @Z2_Heat_Request_Temp > 25 then
+		if @Z2_Heat_Request_Temp > 25 then							-- override if Z2 request is higher than 25 degrees
 			#Z1HRT = @Z2_Heat_Request_Temp;
 		end
-		if #Z1HRT != @Z1_Heat_Request_Temp then
+		if #Z1HRT != @Z1_Heat_Request_Temp then							-- set only when value changed
 			@SetZ1HeatRequestTemperature = #Z1HRT;
 		end
 	end
