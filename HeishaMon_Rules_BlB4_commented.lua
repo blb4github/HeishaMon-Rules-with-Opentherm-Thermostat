@@ -119,7 +119,7 @@ e) Settings Heat Pump: Heating_Mode: 1 (direct), Cooling_Mode: 1 (direct), Buffe
 *Called by*:	system Boot
 rule 01]]
 on System#Boot then
-	print('BLB Heishamon_rules_2611.01.lua');
+	print('BLB Heishamon_rules_2611.05.lua');
 	#chEnableOnMin = -1;			-- Duration (in Minutes) chEnable on (positive) or off (negative)
 	#chEnableChangeTime = -1;		-- Time #chEnable changes
 	#chEnableTimeOff = -1;			-- Time ?chEnable goes off (0)
@@ -137,6 +137,8 @@ on System#Boot then
 	#PIDintegral = 0;			-- cummulative Integral value
 	#RoomTempDelta = 0;			-- Delta between Room Setpoint and Room Temp (positive = temp above setpoint)
 	#RoomTempControl = 0;			-- SHifT Ta as result of #RoomTempDelta
+	#TaPIPhase = 0;				-- 0: old 2610.08 startup; 1: PI transfer
+	#TaPIStepTime = -1;			-- #Time at last accepted PI target step
 	setTimer(1,10);				-- function to set initial values from HP after boot which are not yet available when HeishaMon boots.
 	setTimer(2,20);				-- timer for time reference.
 	setTimer(3,35);				-- TaSHifT function
@@ -157,6 +159,7 @@ end
 rule 02]]
 on timer=1 then
 	#Time = %day * 1440 + %hour * 60 + %minute;							-- #time is a time reference (integer) which is update (+1) every minute.
+	#TaPIStepTime = #Time;
 	#CompStateChangeTime = #Time;									-- set intitial Time for the compressor state
 	#chEnableChangeTime = #Time;									-- set intitial Time for the chEnable state
 	#HPStateR = @Heatpump_State;									-- set Required Heat Pump state to current state
@@ -168,6 +171,7 @@ on timer=1 then
 	#WCS = @Z1_Heat_Request_Temp;									-- set initial Weather Compensation Setpoint to current @Z1_Heat_Request_Temp
 	if @Compressor_Freq > 18 then									-- set #CompState & #CompRunSec to values to indicate compressor is running during first boot
 		#CompState  = 2;									-- Compressor running state (0/1, 2 if already running during rules boot)
+		#TaPIPhase = 1;
 		#CompRunSec = 1999;									-- set #CompRunSec to 1999 to indicated Compressor was running during boot
 	else
 		#CompState  = 0;									-- set #CompState to 0 if compressor is not running during boot
@@ -215,30 +219,29 @@ on @Compressor_Freq then
 		#CompState = 1;										-- set #CompState according state
 		#CompRunSec = 0;									-- (re)set #CompRunSec to 0
 		#CompRunMin = 0;
+		#TaPIPhase = 0;
 		setTimer(11,1);										-- start timer=11 (the #ComRunSec timer), see rule on timer=11
 	elseif @Compressor_Freq < 10 && #CompState > 0 then						-- condition is true if compressor stops
 		#CompStateChangeTime = #Time;								-- set #CompStateChangeTime on the moment the Compressor is switched off
 		#CompState = 0;										-- set #CompState according state
 		#CompRunMin = 0;
 		#TaDeltaTimer = 0;
+		#TaPIPhase = 0;
 	end
 end
 
 --[[
-**timer=3 & @Main_Outlet_Temp, TaShift (heating-target calculation)**
-*Purpose*: Calculate the zone 1 heat request using weather compensation and the living-room PI, with
-  conditional protection against premature compressor shutdown from outlet temperature overshoot.
-*Explanation*: With the compressor running, the normal shift is the greater of (a) the room PI request
-  and (b) the shift needed to keep outlet approximately within 2C above the heating target. The
-  existing outlet-delta timer is a lower-bound safeguard and must never replace a higher PI request.
-  During the first 130 seconds above 7C outside, the original soft-start exception still applies.
-  When the compressor is idle, the existing overnight and anti-cycle suppression remains for a
-  warm room or absent heat demand; if the room is cold and heating is requested, PI can determine
-  the target. The shift is clipped to +/-5C; an explicit zone 2 request >25C still overrides zone 1.
-  The former running-compressor outlet-based upper target cap was removed in 2611.01 because
-  it could suppress PI comfort demand for hours even with the room substantially below setpoint.
-*Result*: @SetZ1HeatRequestTemperature when the requested zone 1 target changes.
-*Called by*: @Main_Outlet_Temp event and timer 3
+**timer=3 & @Main_Outlet_Temp, TaSHifT (Target Temp Manipulations)**
+*Purpose*:	1) lower Target Temp to softstart the compressor run when heat loss < minimum power HP, 2) extend compressor runtime by SHifTing HRT (Heat Request Temperature) if To (Temp Outlet) is higher than HRT,
+		3) Adapt HRT as result of RoomTempDiff and 4) switch off compressor under certain conditions (e.g. roomtemperature too high) by SHifTing Target Temp maximum down.
+*Explanation*:	at a certain (high) outside Temperature the minimum power of the HP is higher than the heat lost and as a result the compressor will switch off if To > HRT + 2 degrees.
+		This can lead to short compressor run times and the purpose of this function is to extend the runtime by SHifTing the Target Temp up. The maximum SHifT is based on outside temperature and below
+		a certain outside temperature (<=9 degrees) the SHifT will not be set (as not required). 2510.18 added logic based on @Main_Outlet_Temp trigger to prevent Compressor switch off at the start of 
+		the run due to too high temperature delta.
+		2611.05 changes: (a) reset of #TaPIPhase on defrost, and (b) the controlled transfer block after the legacy compressor-running target cap. Each PI target step is +1/-1 C, approved by
+		compressor frequency <= #CompFreqTarget after a short observation interval, or by a NEW 15-minute timeout for EACH step.
+*Result*:	@SetZ1HeatRequestTemperature set to required value
+*Called by*:	System#Boot initially, setTimer(3,30) in function itselfs
 rule 05, 06 & 07]]
 
 on @Main_Outlet_Temp then
@@ -257,45 +260,95 @@ on timer=3 then
 end
 
 on TaShift then
-	#NoDefrost = @Defrosting_State == 0 || (@Pump_Flow > 5 && @Pump_Flow < 30);			-- Preserve existing defrost/flow safeguard
-	if #Heat == 1 && @ThreeWay_Valve_State == 0 && #DHWRun < 2 && #NoDefrost == 1 then		-- Only calculate a heating target when space heating is allowed
-		$WCS = #WCS + min(max(@Z2_Heat_Request_Temp - 20,-5), 5);			-- Recalculate effective weather curve every call, including compressor-off periods
-		if #CompState > 0 then								-- Compressor running
-			#TaDelta = @Main_Outlet_Temp - @Z1_Heat_Request_Temp;			-- Current overshoot relative to prior applied target
-			if #OutsideTemp > 7 && #CompRunSec < 130 && #CompRunSec != -1 then	-- Retain existing soft-start exception (first 130 s when outside >7C)
-				#SHifT = ceil(@Main_Outlet_Temp) - 3 - $WCS;			-- Startup target may temporarily be below the room PI request
+	if @Defrosting_State == 1 then									-- Defrost begins/continues: preserve original TaShift logic; restart controlled PI transfer after defrost
+		#TaPIPhase = 0;
+	end
+	#NoDefrost = @Defrosting_State == 0 || (@Pump_Flow > 5 && @Pump_Flow < 30);			-- define NoDefrost to avoid TaShift during defrost or when flow is too low (during defrost)
+	if #Heat == 1 && @ThreeWay_Valve_State == 0 && #DHWRun < 2 && #NoDefrost == 1 then		-- TaShift only required during certain conditions
+		if #CompState > 0 then									-- Compressor is running
+		--	$WCS = #WCS;									-- default WCS to current WCS
+		--	if @Z2_Heat_Request_Temp < 26 then
+			$WCS = #WCS + min(max(@Z2_Heat_Request_Temp - 20,-5), 5);			-- Adjust Weather Compensation Setpoint based on override Z2 Heat Request Temp, with a maximum shift of -5 to +5 degrees
+		--	end
+			#TaDelta = @Main_Outlet_Temp - @Z1_Heat_Request_Temp;				-- Delta between Main Outlet Temp and Heat Request Temp
+			if #OutsideTemp > 7 && #CompRunSec < 130 && #CompRunSec != -1 then		-- 2603.07 changed #CompRunSec < 150 to #CompRunSec < 130
+				#SHifT = ceil(@Main_Outlet_Temp) - 3 - $WCS;				-- set SHifT to lower value if outside temperature is high and during first 3 minutes of compressor run to prevent early switch off due to too high To > HRT delta
+			elseif @Compressor_Freq < 21 && max(#RoomTempControl,
+				ceil(@Main_Outlet_Temp - 1.9 - $WCS)) < #SHifT then			-- 2603.11 added this logic to avoid changes is not required
+				print('no #SHifT required');
 			else
-				#SHifT = max(#RoomTempControl, ceil(@Main_Outlet_Temp - 1.9 - $WCS));	-- PI is the normal minimum; raise target if outlet approaches +2C overshoot
-			end
-			if #TaDelta < 2 then							-- Existing timer-based outlet overshoot monitor
-				#TaDeltaTimer = 0;
+				#SHifT = max(#RoomTempControl,ceil(@Main_Outlet_Temp - 1.9 - $WCS));	-- default SHifT to RoomTempControl, which is based on RoomTempDelta and will be calculated in the PID function (see rule on timer=9). Safeguard to make sure Ta is not going >=2 above setpoint.
+			end 
+			if #TaDelta < 2 then								-- safeguard: increase #ShifT if #TaDelta > 2 degrees for too long to prevent compressor switch off
+				#TaDeltaTimer = 0;							-- reset TaDeltaTimer if delta < 2 degrees
 			elseif #TaDeltaTimer == 0 then
-				#TaDeltaTimer = 10;
-				setTimer(12,10);
-			elseif #TaDeltaTimer >= 80 then
-				#SHifT = max(#SHifT, ceil(@Main_Outlet_Temp - 1.8 - $WCS));	-- Emergency action can only RAISE shift, not overwrite a positive PI demand
+				#TaDeltaTimer = 10;							-- 2603.03 added this line to prevent restarting timer 12 multiple times 
+				setTimer(12,10);							-- start timer=12 to accumulate TaDeltaTimer time
+			elseif #TaDeltaTimer >= 80 then							-- only increase SHifT if TaDeltaTimer > 80 seconds
+				#SHifT = ceil(@Main_Outlet_Temp - 1.8 - $WCS);				-- calculate required SHifT based on Main Outlet Temp and Weather Compensation Setpoint
 			end
-			if #TaDelta >= 3 then
-				#SHifT = max(#SHifT, ceil(@Main_Outlet_Temp) - 2 - $WCS);	-- Same: outlet safeguard is a lower bound, never a PI-cancelling assignment
+			if #TaDelta >= 3 then								-- 2610.02 taken out ($WCS + #SHifT - @Main_Outlet_Temp >=3) again to improve start up logic
+				#SHifT = ceil(@Main_Outlet_Temp) - 2 - $WCS;
 			end
-		elseif ((%hour < 7 || %hour > 22) && (#RoomTempDelta >= 0 || #chEnable == 0)) ||
-			#RoomTempDelta > 0.2 then						-- Night setback/room too warm: preserve -5C suppression unless room is cold AND heat is requested
+
+		elseif (%hour < 7 || %hour > 22 || #RoomTempDelta > 0.2) then				-- compressor is off for a relative short time (depending on outside temperature) and #RoomTempDelta <= 0, SHifT to -5 to avoid short cycle. 603.04 added && #RoomTempDelta > 0
 			#SHifT = -5;
-		elseif #CompRunMin > (-2 * #OutsideTemp - 30) && (#RoomTempDelta > 0.1 || (#RoomTempDelta > 0 && #SHifT == -5)) then
-			#SHifT = -5;								-- Preserve compressor-off hysteresis when room is warm
+		elseif #CompRunMin > (-2 * #OutsideTemp - 30) && 					-- Compressor is not running. 
+			(#RoomTempDelta > 0.1 || (#RoomTempDelta > 0 && #SHifT == -5)) then		-- 2610.04 added hysteresis
+			#SHifT = -5;
 		else
-			#SHifT = 0;
-			if #chEnable == 1 then
-				#SHifT = #RoomTempControl;					-- Use room PI during compressor-off heating demand, when no suppression is needed
+			#SHifT = 0;									-- default SHifT to 0 if compressor is off for a longer time and room temperature isn't too high
+		end
+		#SHifT = min(max(#SHifT, -5), 5);							-- keep #SHifT in the range -5 to +5
+		#Z1HRT = coalesce($WCS, #WCS) + #SHifT;							-- 2603.06 added coalesce to have correct #Z1HRT if #Compressor isn't running
+		if #CompState > 0 then									-- 2610.02 improved ramp up logic
+			#Z1HRT = min(#Z1HRT, max($WCS - 5, ceil(@Main_Outlet_Temp) - 1));
+		end
+		if #CompState > 0 && @Defrosting_State == 0 && @Z2_Heat_Request_Temp <= 25 then		-- PI transfer only during space heating, not during defrost or a direct Z2 target override
+			$PIWanted = $WCS + #RoomTempControl;						-- WAR/PI only defines desired target; no compressor constraints in the PI itself
+			$StepElapsed = #CompRunMin;							-- phase 0: use elapsed time since compressor start for first release
+			if #TaPIPhase == 1 then								-- phase 1: each PI step has its own independent release timer
+				$StepElapsed = (#Time - #TaPIStepTime + 10080) % 10080;			-- elapsed minutes since last accepted PI step; includes weekly clock rollover
+				#Z1HRT = @Z1_Heat_Request_Temp;						-- hold actual current target while awaiting release, to avoid unsolicited target jumps
+			end
+			$OriginalSoftStart = #OutsideTemp > 7 && #CompRunSec < 130 && #CompRunSec != -1;	-- do not override the original first-130-second soft start above 7 C
+			if $OriginalSoftStart == 0 &&
+				($StepElapsed >= 15 || ($StepElapsed >= 2 && @Compressor_Freq <= #CompFreqTarget)) then		-- allow one step on low frequency after observation, or after a fresh 15-minute escape
+				if #TaPIPhase == 0 then							-- first successful release switches from legacy startup to PI transfer
+					#TaPIStepTime = #Time;						-- time reference for next response-dependent PI step
+				end
+				#TaPIPhase = 1;								-- stay in PI-transfer mode until compressor stop or defrost
+				if $PIWanted > @Z1_Heat_Request_Temp then				-- approach the desired target in +1 C steps
+					#Z1HRT = min(@Z1_Heat_Request_Temp + 1, $PIWanted);		-- never increase by more than 1 C per authorized PI step
+				elseif $PIWanted < @Z1_Heat_Request_Temp &&				-- only lower target if there is headroom to the compressor-off temperature condition
+					@Main_Outlet_Temp <= @Z1_Heat_Request_Temp + 0.8 then
+					#Z1HRT = max(@Z1_Heat_Request_Temp - 1, $PIWanted);		-- never decrease by more than 1 C per authorized PI step
+				else
+					#Z1HRT = @Z1_Heat_Request_Temp;					-- hold actual current target while awaiting release, to avoid unsolicited target jumps
+				end
+				if #Z1HRT != @Z1_Heat_Request_Temp then					-- restart step-escape clock only when the target actually changes
+					#TaPIStepTime = #Time;						-- time reference for next response-dependent PI step
+				end
+			end
+			if #TaPIPhase == 1 then								-- phase 1: each PI step has its own independent release timer
+				$SafeTarget = @Z1_Heat_Request_Temp;					-- minimum target required for safe operation (before emergency conditions)
+				if #TaDeltaTimer >= 80 then						-- original prolonged outlet overshoot condition
+					$SafeTarget = max($SafeTarget, ceil(@Main_Outlet_Temp - 1.8));
+				end
+				if #TaDelta >= 3 then							-- original immediate excessive outlet overshoot condition
+					$SafeTarget = max($SafeTarget, ceil(@Main_Outlet_Temp) - 2);
+				end
+				if $SafeTarget > @Z1_Heat_Request_Temp && $SafeTarget > #Z1HRT then	-- emergency correction only if actual outlet overshoot requires raising target
+					#Z1HRT = min(@Z1_Heat_Request_Temp + 1, $SafeTarget);		-- safety correction limited to +1 C per call
+					#TaPIStepTime = #Time;						-- time reference for next response-dependent PI step
+				end
 			end
 		end
-		#SHifT = min(max(#SHifT, -5), 5);					-- Preserve existing +/-5C total shift limit
-		#Z1HRT = $WCS + #SHifT;						-- No permanent outlet-dependent UPPER cap: it previously suppressed room PI for hours
-		if @Z2_Heat_Request_Temp > 25 then
-			#Z1HRT = @Z2_Heat_Request_Temp;				-- Preserve explicit Z2 heating-request override
+		if @Z2_Heat_Request_Temp > 25 then							-- override if Z2 request is higher than 25 degrees
+			#Z1HRT = @Z2_Heat_Request_Temp;
 		end
-		if #Z1HRT != @Z1_Heat_Request_Temp then
-			@SetZ1HeatRequestTemperature = #Z1HRT;			-- Only write when final target changes
+		if #Z1HRT != @Z1_Heat_Request_Temp then							-- set only when value changed
+			@SetZ1HeatRequestTemperature = #Z1HRT;
 		end
 	end
 end
@@ -621,41 +674,45 @@ end
 
 --[[
 **timer=9, PI room correction for TaShift**
-*Purpose*: Calculate the living-room PI correction relative to the weather-compensated baseline (#WCS).
-*Explanation*: #RoomTempDelta is room temperature minus setpoint; the PI error has opposite sign.
-  Provisional gains Kp=1.2 and Ki=0.02 per five-minute sample, with no derivative.
-  Integrate only when aggregate heat demand, space-heating mode and room temperature allow room heat;
-  pause during DHW diversion and defrost. The +0.2C living-room threshold is a proxy for
-  room heat availability, not a direct zone-valve signal.
-  Hold integral across setpoint changes and inactive periods (bumpless integral handover).
-  Conditional integration uses the total PI output +/-5C; absolute integral limits remain +/-50.
-  At Ki=0.02 these correspond to at most +/-1C integral contribution. TaShift target limiting
-  is a separate unresolved issue and is not modified here.
-*Result*: #RoomTempControl
-*Called by*: Boot schedule, then every 300 seconds
+*Purpose*:	Calculate the living-room PI correction relative to the weather-compensated baseline (#WCS).
+*Explanation*:	#RoomTempDelta is room temperature minus setpoint; the PI error has opposite sign. Provisional gains Kp=1.2 and Ki=0.02 per five-minute sample, with no derivative. Integrate only when 
+		aggregate heat demand, space-heating mode and room temperature allow room heat; pause during DHW diversion and defrost. The +0.2C living-room threshold is a proxy for room heat availability,
+		not a direct zone-valve signal. Hold integral across setpoint changes and inactive periods (bumpless integral handover). Conditional integration uses the total PI output +/-5C;
+		absolute integral limits remain +/-50. At Ki=0.02 these correspond to at most +/-1C integral contribution. TaShift target limiting is a separate unresolved issue and is not modified here.
+*Result*:	#RoomTempControl
+*Called by*:	Boot schedule, then every 300 seconds
 rule 13]]
 on timer=9 then
-	setTimer(9,300);						-- Execute PI every five minutes
-	$RoomError = #RoomTempDelta * -1;				-- Positive error means the living room is too cold
-	$PIp = 1.2 * $RoomError;					-- P correction to weather-compensation temperature
-	if #chEnable == 1 && #Heat == 1 && #DHWRun < 2 &&		-- Space heating is potentially available; DHWRun 1 permits space heating
-		@ThreeWay_Valve_State == 0 && @Defrosting_State == 0 &&	-- No DHW diversion or defrost
-		#RoomTempDelta <= 0.2 then				-- Living room not more than 0.2C too warm (availability proxy)
-		$PIintegralNext = min(max(#PIDintegral + $RoomError, -50), 50);	-- Absolute safety limit for accumulated room error
-		$PIcandidate = $PIp + 0.02 * $PIintegralNext;	-- PI output if this sample were integrated
-		if ($PIcandidate <= 5 || $RoomError <= 0) &&	-- Prevent further increase into upper output saturation
-			($PIcandidate >= -5 || $RoomError >= 0) then	-- Prevent further decrease into lower output saturation
-			#PIDintegral = $PIintegralNext;			-- Unwinding remains allowed
+	setTimer(9,300);								-- Execute PI every five minutes
+	$RoomError = #RoomTempDelta * -1;						-- Positive error means the living room is too cold
+	$PIp = 1.2 * $RoomError;							-- P correction to weather-compensation temperature
+	if #chEnable == 1 && #Heat == 1 && #DHWRun < 2 &&				-- Space heating is potentially available; DHWRun 1 permits space heating
+		@ThreeWay_Valve_State == 0 && @Defrosting_State == 0 &&			-- No DHW diversion or defrost
+		#RoomTempDelta <= 0.2 then						-- Living room not more than 0.2C too warm (availability proxy)
+		$PIintegralNext = min(max(#PIDintegral + $RoomError, -50), 50);		-- Absolute safety limit for accumulated room error
+		$PIcandidate = $PIp + 0.02 * $PIintegralNext;				-- PI output if this sample were integrated
+		if ($PIcandidate <= 5 || $RoomError <= 0) &&				-- Prevent further increase into upper output saturation
+			($PIcandidate >= -5 || $RoomError >= 0) then			-- Prevent further decrease into lower output saturation
+			#PIDintegral = $PIintegralNext;					-- Unwinding remains allowed
 		end
 	end
-	$PIoutput = $PIp + 0.02 * #PIDintegral;		-- I is held rather than reset during setpoint changes or interruptions
-	#RoomTempControl = round(min(max($PIoutput, -5), 5));	-- Total PI output within +/-5C; TaShift still applies its own rules
+	$PIoutput = $PIp + 0.02 * #PIDintegral;						-- I is held rather than reset during setpoint changes or interruptions
+	#RoomTempControl = round(min(max($PIoutput, -5), 5));				-- Total PI output within +/-5C; TaShift still applies its own rules
 end
 
+--[[
+**timer=10, Weather Compensation function**
+*Purpose*:	Calculate the #WCS based on outside temperature with possible Shift
+*Explanation*:	Heat loss is largly depending on the outside temperature but no full linear line is possible as Ta can't be too low (heating system can't provide enough heat 
+		to the rooms). The reason for not using the compensation curve from the HP is now #WCS is only calculated every 30 minutes and the TaShift function doesn't
+		cause an unwanted Compressor switch off. Most values for the calculation ($Ta1 = @Z1_Heat_Curve_Target_Low_Temp, $Tb1 = @Z1_Heat_Curve_Outside_High_Temp and 
+		$Tb2 = @Z1_Heat_Curve_Outside_Low_Temp are from Heat pump settings, $Ta2 must be set in rules as @Z1_Heat_Curve_Target_High_Temp will be set to calculated value in direct mode.
+		2512.08: $Ta2 changed from 34 to 36. Default values: 5 ⁰C: 30 ⁰C, -5 ⁰C: 36 ⁰C.
+*Result*:	#WCS, Weather Compensation Setpoint
+*Called by*:	system#boot initially, setTimer(10,1800) in function itselfs
+rule 14]]
 on timer=10 then
 	setTimer(10,1800);											-- run this rule every half hour
---	$Ta1 = @Z1_Heat_Curve_Target_Low_Temp; $Tb1 = @Z1_Heat_Curve_Outside_High_Temp;$Tb2 = @Z1_Heat_Curve_Outside_Low_Temp; $Ta2 = 36;
--- $Ta2 must be set in rules as @Z1_Heat_Curve_Target_High_Temp will be set to calculated value
 	#WCS = min(max(ceil(@Z1_Heat_Curve_Target_Low_Temp + (@Z1_Heat_Curve_Outside_High_Temp - #OutsideTemp)
 		* (36 - @Z1_Heat_Curve_Target_Low_Temp) / (@Z1_Heat_Curve_Outside_High_Temp - @Z1_Heat_Curve_Outside_Low_Temp)),@Z1_Heat_Curve_Target_Low_Temp), 36);
 end

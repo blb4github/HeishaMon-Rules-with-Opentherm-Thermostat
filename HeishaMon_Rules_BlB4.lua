@@ -1,5 +1,5 @@
 on System#Boot then
-	print('BLB Heishamon_rules_2611.01.lua');
+	print('BLB Heishamon_rules_2611.05.lua');
 	#chEnableOnMin = -1;
 	#chEnableChangeTime = -1;
 	#chEnableTimeOff = -1;
@@ -17,6 +17,8 @@ on System#Boot then
 	#PIDintegral = 0;
 	#RoomTempDelta = 0;
 	#RoomTempControl = 0;
+	#TaPIPhase = 0;
+	#TaPIStepTime = -1;
 	setTimer(1,10);
 	setTimer(2,20);
 	setTimer(3,35);
@@ -31,6 +33,7 @@ end
 
 on timer=1 then
 	#Time = %day * 1440 + %hour * 60 + %minute;
+	#TaPIStepTime = #Time;
 	#CompStateChangeTime = #Time;
 	#chEnableChangeTime = #Time;
 	#HPStateR = @Heatpump_State;
@@ -42,6 +45,7 @@ on timer=1 then
 	#WCS = @Z1_Heat_Request_Temp;
 	if @Compressor_Freq > 18 then
 		#CompState = 2;
+		#TaPIPhase = 1;
 		#CompRunSec = 1999;
 	else
 		#CompState = 0;
@@ -71,12 +75,14 @@ on @Compressor_Freq then
 		#CompState = 1;
 		#CompRunSec = 0;
 		#CompRunMin = 0;
+		#TaPIPhase = 0;
 		setTimer(11,1);
 	elseif @Compressor_Freq < 10 && #CompState > 0 then
 		#CompStateChangeTime = #Time;
 		#CompState = 0;
 		#CompRunMin = 0;
 		#TaDeltaTimer = 0;
+		#TaPIPhase = 0;
 	end
 end
 
@@ -96,40 +102,84 @@ on timer=3 then
 end
 
 on TaShift then
+	if @Defrosting_State == 1 then
+		#TaPIPhase = 0;
+	end
 	#NoDefrost = @Defrosting_State == 0 || (@Pump_Flow > 5 && @Pump_Flow < 30);
 	if #Heat == 1 && @ThreeWay_Valve_State == 0 && #DHWRun < 2 && #NoDefrost == 1 then
-		$WCS = #WCS + min(max(@Z2_Heat_Request_Temp - 20,-5), 5);
 		if #CompState > 0 then
+			$WCS = #WCS + min(max(@Z2_Heat_Request_Temp - 20,-5), 5);
 			#TaDelta = @Main_Outlet_Temp - @Z1_Heat_Request_Temp;
 			if #OutsideTemp > 7 && #CompRunSec < 130 && #CompRunSec != -1 then
 				#SHifT = ceil(@Main_Outlet_Temp) - 3 - $WCS;
+			elseif @Compressor_Freq < 21 && max(#RoomTempControl,
+				ceil(@Main_Outlet_Temp - 1.9 - $WCS)) < #SHifT then
+				print('no #SHifT required');
 			else
-				#SHifT = max(#RoomTempControl, ceil(@Main_Outlet_Temp - 1.9 - $WCS));
-			end
+				#SHifT = max(#RoomTempControl,ceil(@Main_Outlet_Temp - 1.9 - $WCS));
+			end 
 			if #TaDelta < 2 then
 				#TaDeltaTimer = 0;
 			elseif #TaDeltaTimer == 0 then
 				#TaDeltaTimer = 10;
 				setTimer(12,10);
 			elseif #TaDeltaTimer >= 80 then
-				#SHifT = max(#SHifT, ceil(@Main_Outlet_Temp - 1.8 - $WCS));
+				#SHifT = ceil(@Main_Outlet_Temp - 1.8 - $WCS);
 			end
 			if #TaDelta >= 3 then
-				#SHifT = max(#SHifT, ceil(@Main_Outlet_Temp) - 2 - $WCS);
+				#SHifT = ceil(@Main_Outlet_Temp) - 2 - $WCS;
 			end
-		elseif ((%hour < 7 || %hour > 22) && (#RoomTempDelta >= 0 || #chEnable == 0)) ||
-			#RoomTempDelta > 0.2 then
+
+		elseif (%hour < 7 || %hour > 22 || #RoomTempDelta > 0.2) then
 			#SHifT = -5;
 		elseif #CompRunMin > (-2 * #OutsideTemp - 30) && (#RoomTempDelta > 0.1 || (#RoomTempDelta > 0 && #SHifT == -5)) then
 			#SHifT = -5;
 		else
 			#SHifT = 0;
-			if #chEnable == 1 then
-				#SHifT = #RoomTempControl;
-			end
 		end
 		#SHifT = min(max(#SHifT, -5), 5);
-		#Z1HRT = $WCS + #SHifT;
+		#Z1HRT = coalesce($WCS, #WCS) + #SHifT;
+		if #CompState > 0 then
+			#Z1HRT = min(#Z1HRT, max($WCS - 5, ceil(@Main_Outlet_Temp) - 1));
+		end
+		if #CompState > 0 && @Defrosting_State == 0 && @Z2_Heat_Request_Temp <= 25 then
+			$PIWanted = $WCS + #RoomTempControl;
+			$StepElapsed = #CompRunMin;
+			if #TaPIPhase == 1 then
+				$StepElapsed = (#Time - #TaPIStepTime + 10080) % 10080;
+				#Z1HRT = @Z1_Heat_Request_Temp;
+			end
+			$OriginalSoftStart = #OutsideTemp > 7 && #CompRunSec < 130 && #CompRunSec != -1;
+			if $OriginalSoftStart == 0 && ($StepElapsed >= 15 || ($StepElapsed >= 2 && @Compressor_Freq <= #CompFreqTarget)) then
+				if #TaPIPhase == 0 then
+					#TaPIStepTime = #Time;
+				end
+				#TaPIPhase = 1;
+				if $PIWanted > @Z1_Heat_Request_Temp then
+					#Z1HRT = min(@Z1_Heat_Request_Temp + 1, $PIWanted);
+				elseif $PIWanted < @Z1_Heat_Request_Temp && @Main_Outlet_Temp <= @Z1_Heat_Request_Temp + 0.8 then
+					#Z1HRT = max(@Z1_Heat_Request_Temp - 1, $PIWanted);
+				else
+					#Z1HRT = @Z1_Heat_Request_Temp;
+				end
+				if #Z1HRT != @Z1_Heat_Request_Temp then
+					#TaPIStepTime = #Time;
+				end
+			end
+			if #TaPIPhase == 1 then
+				$SafeTarget = @Z1_Heat_Request_Temp;
+				if #TaDeltaTimer >= 80 then
+					$SafeTarget = max($SafeTarget, ceil(@Main_Outlet_Temp - 1.8));
+				end
+				if #TaDelta >= 3 then
+					$SafeTarget = max($SafeTarget, ceil(@Main_Outlet_Temp) - 2);
+				end
+				if $SafeTarget > @Z1_Heat_Request_Temp && $SafeTarget > #Z1HRT then
+					#Z1HRT = min(@Z1_Heat_Request_Temp + 1, $SafeTarget);
+					#TaPIStepTime = #Time;
+				end
+			end
+		end
 		if @Z2_Heat_Request_Temp > 25 then
 			#Z1HRT = @Z2_Heat_Request_Temp;
 		end
@@ -370,13 +420,10 @@ on timer=9 then
 	setTimer(9,300);
 	$RoomError = #RoomTempDelta * -1;
 	$PIp = 1.2 * $RoomError;
-	if #chEnable == 1 && #Heat == 1 && #DHWRun < 2 &&
-		@ThreeWay_Valve_State == 0 && @Defrosting_State == 0 &&
-		#RoomTempDelta <= 0.2 then
+	if #chEnable == 1 && #Heat == 1 && #DHWRun < 2 && @ThreeWay_Valve_State == 0 && @Defrosting_State == 0 && #RoomTempDelta <= 0.2 then
 		$PIintegralNext = min(max(#PIDintegral + $RoomError, -50), 50);
 		$PIcandidate = $PIp + 0.02 * $PIintegralNext;
-		if ($PIcandidate <= 5 || $RoomError <= 0) &&
-			($PIcandidate >= -5 || $RoomError >= 0) then
+		if ($PIcandidate <= 5 || $RoomError <= 0) && ($PIcandidate >= -5 || $RoomError >= 0) then
 			#PIDintegral = $PIintegralNext;
 		end
 	end
