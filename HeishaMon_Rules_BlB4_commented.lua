@@ -136,9 +136,9 @@ on System#Boot then
 	#QMR = -1;				-- Required Quiet Mode
 	#PIDintegral = 0;			-- cummulative Integral value
 	#RoomTempDelta = 0;			-- Delta between Room Setpoint and Room Temp (positive = temp above setpoint)
-	#RoomTempControl = 0;
-	#TaPIPhase = 0;              -- 0: old 2610.08 startup; 1: PI transfer
-	#TaPIStepTime = -1;          -- #Time at the last target step			-- SHifT Ta as result of #RoomTempDelta
+	#RoomTempControl = 0;			-- SHifT Ta as result of #RoomTempDelta
+	#TaPIPhase = 0;				-- 0: old 2610.08 startup; 1: PI transfer
+	#TaPIStepTime = -1;			-- #Time at last accepted PI target step
 	setTimer(1,10);				-- function to set initial values from HP after boot which are not yet available when HeishaMon boots.
 	setTimer(2,20);				-- timer for time reference.
 	setTimer(3,35);				-- TaSHifT function
@@ -335,7 +335,7 @@ on TaShift then
 				if #TaDelta >= 3 then
 					$SafeTarget = max($SafeTarget, ceil(@Main_Outlet_Temp) - 2);
 				end
-				if $SafeTarget > #Z1HRT then
+				if $SafeTarget > @Z1_Heat_Request_Temp && $SafeTarget > #Z1HRT then
 					#Z1HRT = min(@Z1_Heat_Request_Temp + 1, $SafeTarget);
 					#TaPIStepTime = #Time;
 				end
@@ -350,6 +350,16 @@ on TaShift then
 	end
 end
 
+--[[
+**timer=4, OpenThermThermostat**
+*Purpose*:	to control the HP Heat & Cool prodcution by the Opentherm Thermostat and set max pump duty.
+*Explanation*:	Heating: The main control is ?chEnable; chEnable does have similar function as an ON/OFF thermostat 
+		The HP will be switched ON if #chEnable == 1 and the RoomTemp isn't too high. The HP will be switched OFF if all of the following conditions are true:
+		a) chEnable > 30 minutes OFF (or chEnable > 15 minutes OFF AND compressor > 15 minutes OFF) and b) compressor is OFF or running > 60 minutes and c) outside temperature < 5 degrees. 
+		This last condition is to keep the waterpump running at low temperatures.
+		Cooling: Cooling request is comming from Opentherm ?CoolingEnable parameter with some safeguards. Z1CoolRequestTemperature will be set to ?coolingControl with some safeguards.
+*Called by*:	System#Boot initially, setTimer(4,60) in function itselfs
+rule 08]]
 on timer=4 then
 	setTimer(4,60);												-- run every minute, Thermostat function only required during certain conditions 
 	if @Sterilization_State == 0 && #DHWRun < 2 then							-- OpenThermThermostat only possible if no Sterilization and no DHWRun (during DHWRun #DHWRun = 2 or 3)		
