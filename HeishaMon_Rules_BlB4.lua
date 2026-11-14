@@ -177,7 +177,7 @@ on TaShift then
 				if #TaDelta >= 3 then
 					$SafeTarget = max($SafeTarget, ceil(@Main_Outlet_Temp) - 2);
 				end
-				if $SafeTarget > #Z1HRT then
+				if $SafeTarget > @Z1_Heat_Request_Temp && $SafeTarget > #Z1HRT then
 					#Z1HRT = min(@Z1_Heat_Request_Temp + 1, $SafeTarget);
 					#TaPIStepTime = #Time;
 				end
