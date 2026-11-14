@@ -1,5 +1,5 @@
 on System#Boot then
-	print('BLB Heishamon_rules_2611.05.lua');
+	print('BLB Heishamon_rules_2611.06.lua');
 	#chEnableOnMin = -1;
 	#chEnableChangeTime = -1;
 	#chEnableTimeOff = -1;
@@ -7,7 +7,6 @@ on System#Boot then
 	#CompRunSec = -1;
 	#CompRunMin = -1;
 	#CoolingEnable = -1;
-	#Debug = 1;
 	#DHWComfortDay = 4;
 	#DHWRun = -1;
 	#DHWSterilizationDay = 7;
@@ -17,7 +16,6 @@ on System#Boot then
 	#PIDintegral = 0;
 	#RoomTempDelta = 0;
 	#RoomTempControl = 0;
-	#TaPIPhase = 0;
 	#TaPIStepTime = -1;
 	setTimer(1,10);
 	setTimer(2,20);
@@ -33,7 +31,6 @@ end
 
 on timer=1 then
 	#Time = %day * 1440 + %hour * 60 + %minute;
-	#TaPIStepTime = #Time;
 	#CompStateChangeTime = #Time;
 	#chEnableChangeTime = #Time;
 	#HPStateR = @Heatpump_State;
@@ -45,7 +42,7 @@ on timer=1 then
 	#WCS = @Z1_Heat_Request_Temp;
 	if @Compressor_Freq > 18 then
 		#CompState = 2;
-		#TaPIPhase = 1;
+		#TaPIStepTime = #Time;
 		#CompRunSec = 1999;
 	else
 		#CompState = 0;
@@ -75,14 +72,14 @@ on @Compressor_Freq then
 		#CompState = 1;
 		#CompRunSec = 0;
 		#CompRunMin = 0;
-		#TaPIPhase = 0;
+		#TaPIStepTime = -1;
 		setTimer(11,1);
 	elseif @Compressor_Freq < 10 && #CompState > 0 then
 		#CompStateChangeTime = #Time;
 		#CompState = 0;
 		#CompRunMin = 0;
 		#TaDeltaTimer = 0;
-		#TaPIPhase = 0;
+		#TaPIStepTime = -1;
 	end
 end
 
@@ -93,17 +90,17 @@ on @Main_Outlet_Temp then
 end
 
 on timer=3 then
-	$t3Timer = 60;
 	if #CompRunSec < 150 || #TaDeltaTimer > 0 then
-		$t3Timer = 15;
+		setTimer(3,15);
+	else
+		setTimer(3,60);
 	end
-	setTimer(3,$t3Timer);
 	TaShift();
 end
 
 on TaShift then
 	if @Defrosting_State == 1 then
-		#TaPIPhase = 0;
+		#TaPIStepTime = -1;
 	end
 	#NoDefrost = @Defrosting_State == 0 || (@Pump_Flow > 5 && @Pump_Flow < 30);
 	if #Heat == 1 && @ThreeWay_Valve_State == 0 && #DHWRun < 2 && #NoDefrost == 1 then
@@ -143,39 +140,28 @@ on TaShift then
 			#Z1HRT = min(#Z1HRT, max($WCS - 5, ceil(@Main_Outlet_Temp) - 1));
 		end
 		if #CompState > 0 && @Defrosting_State == 0 && @Z2_Heat_Request_Temp <= 25 then
-			$PIWanted = $WCS + #RoomTempControl;
-			$StepElapsed = #CompRunMin;
-			if #TaPIPhase == 1 then
-				$StepElapsed = (#Time - #TaPIStepTime + 10080) % 10080;
+			if #TaPIStepTime >= 0 then
 				#Z1HRT = @Z1_Heat_Request_Temp;
 			end
-			$OriginalSoftStart = #OutsideTemp > 7 && #CompRunSec < 130 && #CompRunSec != -1;
-			if $OriginalSoftStart == 0 && ($StepElapsed >= 15 || ($StepElapsed >= 2 && @Compressor_Freq <= #CompFreqTarget)) then
-				if #TaPIPhase == 0 then
-					#TaPIStepTime = #Time;
-				end
-				#TaPIPhase = 1;
-				if $PIWanted > @Z1_Heat_Request_Temp then
-					#Z1HRT = min(@Z1_Heat_Request_Temp + 1, $PIWanted);
-				elseif $PIWanted < @Z1_Heat_Request_Temp && @Main_Outlet_Temp <= @Z1_Heat_Request_Temp + 0.8 then
-					#Z1HRT = max(@Z1_Heat_Request_Temp - 1, $PIWanted);
+			if (#OutsideTemp <= 7 || #CompRunSec >= 130 || #CompRunSec == -1) && ((#TaPIStepTime < 0 && (#CompRunMin >= 15 || (#CompRunMin >= 2 && @Compressor_Freq <= #CompFreqTarget))) || (#TaPIStepTime >= 0 && ((#Time - #TaPIStepTime + 10080) % 10080 >= 15 || ((#Time - #TaPIStepTime + 10080) % 10080 >= 2 && @Compressor_Freq <= #CompFreqTarget)))) then
+				if $WCS + #RoomTempControl > @Z1_Heat_Request_Temp then
+					#Z1HRT = min(@Z1_Heat_Request_Temp + 1, $WCS + #RoomTempControl);
+				elseif $WCS + #RoomTempControl < @Z1_Heat_Request_Temp && @Main_Outlet_Temp <= @Z1_Heat_Request_Temp + 0.8 then
+					#Z1HRT = max(@Z1_Heat_Request_Temp - 1, $WCS + #RoomTempControl);
 				else
 					#Z1HRT = @Z1_Heat_Request_Temp;
 				end
-				if #Z1HRT != @Z1_Heat_Request_Temp then
+				if #TaPIStepTime < 0 || #Z1HRT != @Z1_Heat_Request_Temp then
 					#TaPIStepTime = #Time;
 				end
 			end
-			if #TaPIPhase == 1 then
-				$SafeTarget = @Z1_Heat_Request_Temp;
-				if #TaDeltaTimer >= 80 then
-					$SafeTarget = max($SafeTarget, ceil(@Main_Outlet_Temp - 1.8));
+			if #TaPIStepTime >= 0 then
+				if #TaDeltaTimer >= 80 && ceil(@Main_Outlet_Temp - 1.8) > @Z1_Heat_Request_Temp then
+					#Z1HRT = max(#Z1HRT, min(@Z1_Heat_Request_Temp + 1, ceil(@Main_Outlet_Temp - 1.8)));
+					#TaPIStepTime = #Time;
 				end
-				if #TaDelta >= 3 then
-					$SafeTarget = max($SafeTarget, ceil(@Main_Outlet_Temp) - 2);
-				end
-				if $SafeTarget > @Z1_Heat_Request_Temp && $SafeTarget > #Z1HRT then
-					#Z1HRT = min(@Z1_Heat_Request_Temp + 1, $SafeTarget);
+				if #TaDelta >= 3 && ceil(@Main_Outlet_Temp) - 2 > @Z1_Heat_Request_Temp then
+					#Z1HRT = max(#Z1HRT, min(@Z1_Heat_Request_Temp + 1, ceil(@Main_Outlet_Temp) - 2));
 					#TaPIStepTime = #Time;
 				end
 			end
