@@ -2,7 +2,7 @@
 
 These are the rules I use to control a Panasonic heat pump with an OpenTherm thermostat. They are tailored to my installation; use them as inspiration and adapt the settings and integration to your own system.
 
-## Current version: 2611.01 (review candidate)
+## Current version: 2611.07 (2026-11-15)
 
 See [CHANGELOG.md](CHANGELOG.md) for the changes in each published version.
 
@@ -16,7 +16,7 @@ The `.lua` extension is a filename convention: these files use the **HeishaMon r
 ## My setup
 
 - Panasonic WH-MDC07J3E5 for heating, cooling and domestic hot water with an external tank; radiators and convectors.
-- HeishaMon Large running a custom ESP32-S3 firmware build with extended GPIO support. **The standard HeishaMon firmware does not provide the `gpio(33)` Rules functionality used by version 2610.08 and later.** See the firmware requirement below.
+- HeishaMon Large (ESP32-S3), currently on a firmware build identified as **4.4.0**. The Rules require `gpio(33)` support for HEMS Dim; verify that capability in the actual firmware build rather than relying on the version number alone. See the firmware requirement below.
 - CZ-TAW1 connected to the proxy port; I do not use it actively.
 - Honeywell Evohome with an R8810 OpenTherm bridge, connected through an OpenTherm Gateway.
 - Home Assistant with Evohome and OpenTherm Gateway integrations. Home Assistant supplies the living-room target and current temperature through the OTGW as normal OpenTherm room values, because Evohome's `chSetpoint` is not suitable as the primary control input for this heat-pump strategy.
@@ -34,9 +34,24 @@ The `.lua` extension is a filename convention: these files use the **HeishaMon r
 7. Control cooling using Home Assistant/OpenTherm enable and water-temperature requests.
 8. Handle the weekly clock rollover in compressor and thermostat elapsed-time calculations.
 
-### TaShift improvements included in 2611.01
+### TaShift/PI handover in 2611.06
 
-TaShift now treats the room PI correction as the normal heating-target offset during sustained compressor operation. Existing startup, DHW/defrost, compressor-off hysteresis, shift limits and explicit Z2 override remain, but outlet overshoot safeguards can only raise the target rather than erase a positive PI request. For night setback, compressor-off target suppression no longer applies while the room is cold AND heating demand is present. This is a draft change, **not field-tested**. See [TaShift design review](docs/TA-SHIFT-2611-01-REVIEW.md).
+Rules 2611.06 combine the established 2610.08 compressor-start and defrost behavior with the room-temperature PI controller from 2611.01 (timer 9, P=1.2, I=0.02 per five-minute cycle, no D). The heating target is transferred toward the weather-compensation-plus-PI request in **steps of at most 1 °C**. Each step requires the compressor frequency to be at or below `#CompFreqTarget` after at least two minutes, **or** a newly started 15-minute timeout since the last step. Outlet overshoot safeguards and direct Zone 2 request overrides remain in place.
+
+The preceding 2611.05 candidate could not be loaded because it exceeded the Rules engine's **127-variable limit**; 2611.06 removed redundant state/temporary variables. The author confirmed that 2611.06 loaded and heated the home, and merged the fix. See [2611.06 technical notes](docs/TA-SHIFT-2611-06-REVIEW.md).
+
+### Startup initialization in 2611.07
+
+A firmware-startup log from 15 November 2026 showed `timer=1` running before all relevant heat-pump data had been received. Values including `#OutsideTemp` and `#HPStateP` became `NULL`. The same session showed frequent `SetHeatpump` ON/OFF commands; **the causal link was not established conclusively**.
+
+Version 2611.07 addresses the initialization race:
+
+- `System#Boot` initializes local rule state and schedules **only `timer=1` after ten seconds**.
+- `timer=1` uses `isset()` to wait for five selected heat-pump fields (`@Heatpump_State`, `@Operating_Mode_State`, `@Outside_Temp`, `@Z1_Heat_Request_Temp`, `@Compressor_Freq`) and three OpenTherm inputs (`?roomTempSet`, `?roomTemp`, `?chEnable`).
+- If any checked value is unavailable, it logs `timer=1: waiting for HP / OT values` and retries after **five seconds**. It does not start the dependent periodic timers.
+- After successful initialization, it schedules timers 2–10 in their **existing order and original normal-boot cadence**. The application logic, TaShift and PI controller are unchanged.
+
+The guard is deliberately limited to those eight values; it is not a blanket readiness test for every heat-pump register. See [2611.07 startup notes](docs/STARTUP-2611-07.md) and [CHANGELOG.md](CHANGELOG.md).
 
 ## OpenTherm room values
 
@@ -55,13 +70,13 @@ In this installation the Evohome/ramses room-temperature value occasionally show
 
 Home Assistant therefore filters the raw living-room temperature before sending it to the OTGW with `RT=`. The current setup uses a Home Assistant `filter` sensor with a `lowpass` filter, `time_constant: 15` and `precision: 2`, and the OTGW automation rounds the filtered result to 0.1 °C before sending it. This filtering is installation-specific and is not part of the HeishaMon rules themselves.
 
-## Firmware requirement for GPIO33 (2610.08)
+## Firmware requirements for GPIO33
 
-**Important:** this ruleset uses `gpio(33)` in timer 8. The GPIO functionality is **not available in standard HeishaMon firmware**, so loading this ruleset on a standard build is not sufficient to enable HEMS Dim mode.
+**Important:** this ruleset uses `gpio(33)` in timer 8. This requires a firmware build whose Rules engine implements GPIO access, not merely any firmware labeled 4.4.0. Confirm support on your hardware/build before using HEMS Dim mode.
 
-**Compatible custom firmware release:** [HeishaMon Large – GPIO + synchronous webserver (`blb4-gpio-webserver-1.0.0`)](https://github.com/blb4github/HeishaMon/releases/tag/blb4-gpio-webserver-1.0.0). This is an author's pre-release build with extended GPIO support, built from commit [`20df324`](https://github.com/blb4github/HeishaMon/commit/20df32456cdb5a189d614e9424b73c099a19f5dd) and published with the firmware artifact `Heishamon-firmware-Alpha-20df324.zip`. It provides the GPIO functionality needed for the Rules 2610.08 and later HEMS Dim feature. It also contains experimental improvements to the synchronous webserver; it is **not an official upstream HeishaMon release**.
+**Earlier compatible custom firmware release (historical reference):** [HeishaMon Large – GPIO + synchronous webserver (`blb4-gpio-webserver-1.0.0`)](https://github.com/blb4github/HeishaMon/releases/tag/blb4-gpio-webserver-1.0.0). This is an author's pre-release build with extended GPIO support, built from commit [`20df324`](https://github.com/blb4github/HeishaMon/commit/20df32456cdb5a189d614e9424b73c099a19f5dd) and published with the firmware artifact `Heishamon-firmware-Alpha-20df324.zip`. It provides the GPIO functionality needed for the Rules 2610.08 and later HEMS Dim feature. It also contains experimental improvements to the synchronous webserver; it is **not an official upstream HeishaMon release**.
 
-The firmware source is in the [blb4github/HeishaMon fork](https://github.com/blb4github/HeishaMon). Download the firmware attachment from the linked release, rather than assuming the current head of a development branch is identical to this build. Verify the firmware binary matches your HeishaMon hardware and GPIO configuration before flashing.
+The firmware source is in the [blb4github/HeishaMon fork](https://github.com/blb4github/HeishaMon). The linked pre-release documents an earlier known GPIO-capable build, **not** the firmware now running in the author's installation. When using that earlier release, download its specific firmware attachment; for firmware 4.4.0, verify GPIO support and compatibility with your hardware before flashing.
 
 Firmware without the required Rules GPIO support may fail to parse or evaluate `gpio(33)`; do not assume that a normal build will silently ignore Dim mode. The other parts of this ruleset also depend on the HeishaMon 4.x Rules and OpenTherm functions mentioned above.
 
@@ -76,11 +91,11 @@ Whenever `#chEnable` changes, timer 8 updates `#chEnableChangeTime`; the normal 
 
 The 2610.08 Dim behaviour supersedes the simpler GPIO33 heat-demand block from 2610.05/2610.06.
 
-## Startup protection (2610.07)
+## Startup protection (2610.07 and 2611.07)
 
 The `on @Main_Outlet_Temp` handler now calls `TaShift()` only when `isset(#Time)` is true. Timer 1 initialises `#Time` and adopts the current heat-pump state, including `#CompState = 2` if the compressor is already running at startup. This prevents the outlet-temperature event from calling TaShift before timer 1 has initialised the rules' state.
 
-This is **an initialisation-order guard**, not a three-minute ban on lowering the heating target; the rest of the TaShift setpoint logic remains unchanged.
+This is **an initialisation-order guard**, not a three-minute ban on lowering the heating target. As of 2611.07, `timer=1` also gates the startup of periodic timers 2–10 on eight checked input values. Event-driven Rules, including the `@Compressor_Freq` handler, are not themselves delayed by this timer gate; boot logs should still be reviewed after firmware upgrades.
 
 ## Other integration values to check
 
@@ -94,8 +109,9 @@ This is **an initialisation-order guard**, not a three-minute ban on lowering th
 
 1. Save a copy of your existing rules and check the settings and integration above.
 2. Load the contents of `HeishaMon_Rules_BlB4.lua` into the HeishaMon rules editor, without Markdown fences.
-3. Check the boot log for `BLB Heishamon_rules_2610.08.lua` and monitor operation in your installation.
-4. Verify that `?roomTempSet` and `?roomTemp` contain the intended living-room target and current temperature before relying on room-temperature correction.
+3. Check the boot log for `BLB Heishamon_rules_2611.07.lua`. If some inputs are not ready, look for `timer=1: waiting for HP / OT values` and confirm the periodic timers start once initialization succeeds.
+4. Verify that `#OutsideTemp` and `#HPStateP` are numeric, `?roomTempSet` and `?roomTemp` contain the intended values, and unwanted repeated `@SetHeatpump` commands do not occur.
+5. Monitor real operation, including heat-pump starts, compressor frequency, target temperature and defrosts. A successful load does not by itself validate physical control behavior.
 
 For edits, work in `HeishaMon_Rules_BlB4_commented.lua`, then generate the ready-to-load file using the [HeishaMon rules minifier](https://github.com/klaashoekstra94/heishamon_rules_minify). Keep both files in sync.
 
