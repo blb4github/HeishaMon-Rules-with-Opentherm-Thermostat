@@ -1,5 +1,29 @@
 # Changelog
 
+## 2611.07 — 2026-11-15 (startup data-readiness guard)
+
+**Use input readiness rather than a fixed boot delay to initialize rule state.** This is the source provided as the author's current ruleset; dynamic behavior after the change still requires observation.
+
+- In `System#Boot`, schedule **only timer 1** after ten seconds. Previously the boot handler also scheduled timers 2 through 10 independently, allowing their execution before the one-time initialization had succeeded.
+- In timer 1, require `isset()` for five selected heat-pump values (`@Heatpump_State`, `@Operating_Mode_State`, `@Outside_Temp`, `@Z1_Heat_Request_Temp`, `@Compressor_Freq`) and three OpenTherm values (`?roomTempSet`, `?roomTemp`, `?chEnable`). Zero is a valid initialized value.
+- When a checked input is absent, log `timer=1: waiting for HP / OT values`, retry timer 1 after five seconds, and do not schedule the other periodic timers yet. Once the checked inputs exist, initialize the existing variables and then start timers 2–10.
+- Preserve the original normal-case first execution offsets and ordering of timers 2–10 (measured from boot, assuming timer 1 runs at +10 s): 2=+20 s, 3=+35 s, 4=+40 s, 5=+45 s, 6=+50 s, 7=+55 s, 8=+60 s, 9=+65 s, 10=+32 s. On retries, they all shift together.
+- No changes to the TaShift and PI control algorithms, GPIO33 demand logic, DHW logic, pump duty or Quiet Mode. Update the rule version string to 2611.07.
+- Uploaded readable and ready-to-load files were checked to have the same executable expressions after removing comments/formatting. Their waiting-message text has a harmless spacing difference; both versions are retained exactly as supplied.
+- **Motivation:** during the firmware 4.4.0 startup on 2026-11-15, some values were still `NULL` when timer 1 ran. A repeating heat-pump ON/OFF sequence was also observed, but the initialization race is a suspected contributor rather than a proven exclusive cause. See [startup notes](docs/STARTUP-2611-07.md).
+
+## 2611.06 — 2026-11-15 (variable-capacity correction and PI handover)
+
+- Combine the original 2610.08 startup/defrost behavior with the unchanged 2611.01 PI controller, using a stepwise ±1 °C transfer toward the WAR/PI target.
+- Require compressor frequency at or below `#CompFreqTarget` after at least two minutes, or a fresh 15-minute escape for **each individual** target step.
+- Avoid exceeding the HeishaMon Rules **127-variable limit**: use one `#TaPIStepTime` variable for both phase and timestamp; remove the redundant phase and temporary variables, unused `#Debug`, and `$t3Timer`.
+- The author confirmed that 2611.06 loaded successfully and heated the home. [PR #9](https://github.com/blb4github/HeishaMon-Rules-with-Opentherm-Thermostat/pull/9) was merged. See [technical notes](docs/TA-SHIFT-2611-06-REVIEW.md).
+
+## 2611.05 — 2026-11-14 (superseded; rejected on device)
+
+- Proposed controlled stepwise PI transfer after the 2610.08 soft start. This historical change was merged as PR #8, but the device rejected it with `ERROR: maximum number of 127 variables reached`; HeishaMon fell back to its previously loaded rules.
+- Replaced by 2611.06, which addressed the variable table limit.
+
 ## 2611.01 — review candidate (2026-11-13; not field-tested)
 
 **Combined PI (timer 9) and TaShift update, prepared as one release before initial deployment.**
