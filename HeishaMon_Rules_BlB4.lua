@@ -1,5 +1,5 @@
 on System#Boot then
-	print('BLB Heishamon_rules_2611.06.lua');
+	print('BLB Heishamon_rules_2611.07.lua');
 	#chEnableOnMin = -1;
 	#chEnableChangeTime = -1;
 	#chEnableTimeOff = -1;
@@ -18,40 +18,45 @@ on System#Boot then
 	#RoomTempControl = 0;
 	#TaPIStepTime = -1;
 	setTimer(1,10);
-	setTimer(2,20);
-	setTimer(3,35);
-	setTimer(4,40);
-	setTimer(5,45);
-	setTimer(6,50);
-	setTimer(7,55);
-	setTimer(8,60);
-	setTimer(9,65);
-	setTimer(10,32);
 end
 
 on timer=1 then
-	#Time = %day * 1440 + %hour * 60 + %minute;
-	#CompStateChangeTime = #Time;
-	#chEnableChangeTime = #Time;
-	#HPStateR = @Heatpump_State;
-	#HPStateP = @Heatpump_State;
-	#OMR = @Operating_Mode_State;
-	#OutsideTemp = @Outside_Temp;
-	#RoomSetpoint = min(max(?roomTempSet, 10), 22);
-	#RoomTemp = ?roomTemp;
-	#WCS = @Z1_Heat_Request_Temp;
-	if @Compressor_Freq > 18 then
-		#CompState = 2;
-		#TaPIStepTime = #Time;
-		#CompRunSec = 1999;
-	else
-		#CompState = 0;
+	if isset(@Heatpump_State) && isset(@Operating_Mode_State) && isset(@Outside_Temp) && isset(@Z1_Heat_Request_Temp) && isset(@Compressor_Freq) && isset(?roomTempSet) && isset(?roomTemp) && isset(?chEnable) then
+		#Time = %day * 1440 + %hour * 60 + %minute;
+		#CompStateChangeTime = #Time;
+		#chEnableChangeTime = #Time;
+		#HPStateR = @Heatpump_State;
+		#HPStateP = @Heatpump_State;
+		#OMR = @Operating_Mode_State;
+		#OutsideTemp = @Outside_Temp;
+		#RoomSetpoint = min(max(?roomTempSet, 10), 22);
+		#RoomTemp = ?roomTemp;
+		#WCS = @Z1_Heat_Request_Temp;
+		if @Compressor_Freq > 18 then
+			#CompState = 2;
+			#TaPIStepTime = #Time;
+			#CompRunSec = 1999;
+		else
+			#CompState = 0;
+		end
+		if @ThreeWay_Valve_State then
+			#DHWRun = 3;
+		end
+		#chEnable = ?chEnable;
+		#DHWTempP = @DHW_Temp;
+		setTimer(2,10);
+		setTimer(3,25);
+		setTimer(4,30);
+		setTimer(5,35);
+		setTimer(6,40);
+		setTimer(7,45);
+		setTimer(8,50);
+		setTimer(9,55);
+		setTimer(10,22);
+    	else
+        	print('timer=1: waiting for HP / OT values');
+        	setTimer(1,5);
 	end
-	if @ThreeWay_Valve_State then
-		#DHWRun = 3;
-	end
-	#chEnable = ?chEnable;
-	#DHWTempP = @DHW_Temp;
 end
 
 on timer=2 then
