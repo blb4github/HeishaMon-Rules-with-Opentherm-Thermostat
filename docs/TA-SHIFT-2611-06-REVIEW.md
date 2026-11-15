@@ -1,4 +1,4 @@
-# TaShift 2611.06 — variable-capacity correction (draft)
+# TaShift 2611.06 — variable-capacity correction (historical review)
 
 ## Diagnosed loading failure, 2026-11-15 00:04:23
 
@@ -23,6 +23,9 @@ The logging shows 2611.01 loaded with 126/127 variable slots; 2611.05 reached 12
 - Uses existing `#Time` (minute-of-week); `%time` is not required.
 - During boot with compressor already running, set `#TaPIStepTime = #Time` to avoid starting a low-temperature startup from a Rules reload.
 
-## Validation
+## Validation and status update (2026-11-15)
 
-Static inspection confirms the annotated and executable Rules match and PI is unchanged. The expected number of Rules variable slots is approximately 126/127 based on the previous firmware log. **This version has NOT yet been compiled or loaded by the actual HeishaMon Rules engine**. Re-check load log, `varstack slots` and compressor/target behavior before accepting. Do not merge without user approval.
+- Static inspection confirmed the documented and ready-to-load code agree and timer 9 PI is preserved.
+- The author subsequently **loaded 2611.06 successfully on HeishaMon**, confirmed that the house was heating, and merged [PR #9](https://github.com/blb4github/HeishaMon-Rules-with-Opentherm-Thermostat/pull/9). This supersedes the provisional "not loaded" status from the original review.
+- The exact on-device variable-slot count and complete seasonal/defrost performance were not independently verified.
+- **2611.07** was then supplied to guard the early boot initialization under firmware 4.4.0. That subsequent version does not alter TaShift/PI; see [startup notes](STARTUP-2611-07.md).
