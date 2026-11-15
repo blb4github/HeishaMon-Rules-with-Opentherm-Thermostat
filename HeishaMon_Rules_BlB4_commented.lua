@@ -78,6 +78,7 @@ Release
 2610.08		GPIO33 now selects room-temperature-based #chEnable in Dim; Evohome demand is ignored in Dim.
 2611.01		New, Impoved PI(D) and TaShift logic
 2611.06		TaShift logic was changed to drastic, now improved with better shift from start up to thermostat controlled logic
+2611.07		Timers 2 to 10 moved from Boot to timer 1 to avoid start of logic before HP & time variables are defines after boot
 
 **My environment:**
 a) Panasonic WH-MDC07J3E5 Heat Pump used for heating, Cooling and DHW (external tank);
@@ -121,7 +122,7 @@ e) Settings Heat Pump: Heating_Mode: 1 (direct), Cooling_Mode: 1 (direct), Buffe
 *Called by*:	system Boot
 rule 01]]
 on System#Boot then
-	print('BLB Heishamon_rules_2611.06.lua');
+	print('BLB Heishamon_rules_2611.07.lua');
 	#chEnableOnMin = -1;			-- Duration (in Minutes) chEnable on (positive) or off (negative)
 	#chEnableChangeTime = -1;		-- Time #chEnable changes
 	#chEnableTimeOff = -1;			-- Time ?chEnable goes off (0)
@@ -141,15 +142,6 @@ on System#Boot then
 	#RoomTempControl = 0;			-- SHifT Ta as result of #RoomTempDelta
 	#TaPIStepTime = -1;			-- #Time at last accepted PI target step
 	setTimer(1,10);				-- function to set initial values from HP after boot which are not yet available when HeishaMon boots.
-	setTimer(2,20);				-- timer for time reference.
-	setTimer(3,35);				-- TaSHifT function
-	setTimer(4,40);				-- OTT function
-	setTimer(5,45);				-- DHW function
-	setTimer(6,50);				-- PumpDuty function
-	setTimer(7,55);				-- QuietMode function
-	setTimer(8,60);				-- sync function
-	setTimer(9,65);				-- PID function
-	setTimer(10,32);			-- Compensation curve function
 end
 
 --[[
@@ -159,28 +151,49 @@ end
 *Called by*:	System#Boot
 rule 02]]
 on timer=1 then
-	#Time = %day * 1440 + %hour * 60 + %minute;							-- #time is a time reference (integer) which is update (+1) every minute.
-	#CompStateChangeTime = #Time;									-- set intitial Time for the compressor state
-	#chEnableChangeTime = #Time;									-- set intitial Time for the chEnable state
-	#HPStateR = @Heatpump_State;									-- set Required Heat Pump state to current state
-	#HPStateP = @Heatpump_State;									-- set Previous Heat Pump state as well to current state
-	#OMR = @Operating_Mode_State;									-- set Required Operating Mode to current state
-	#OutsideTemp = @Outside_Temp;									-- set OusideTemp
-	#RoomSetpoint = min(max(?roomTempSet, 10), 22);							-- Room Setpoint
-	#RoomTemp = ?roomTemp;										-- Room Temperature. 2610.03 changed to use ?roomTemp
-	#WCS = @Z1_Heat_Request_Temp;									-- set initial Weather Compensation Setpoint to current @Z1_Heat_Request_Temp
-	if @Compressor_Freq > 18 then									-- set #CompState & #CompRunSec to values to indicate compressor is running during first boot
-		#CompState  = 2;									-- Compressor running state (0/1, 2 if already running during rules boot)
-		#TaPIStepTime = #Time;
-		#CompRunSec = 1999;									-- set #CompRunSec to 1999 to indicated Compressor was running during boot
-	else
-		#CompState  = 0;									-- set #CompState to 0 if compressor is not running during boot
+	if isset(@Heatpump_State) &&
+        	isset(@Operating_Mode_State) &&
+        	isset(@Outside_Temp) &&
+        	isset(@Z1_Heat_Request_Temp) &&
+        	isset(@Compressor_Freq) &&
+        	isset(?roomTempSet) &&
+        	isset(?roomTemp) &&
+        	isset(?chEnable) then
+		#Time = %day * 1440 + %hour * 60 + %minute;				-- #time is a time reference (integer) which is update (+1) every minute.
+		#CompStateChangeTime = #Time;						-- set intitial Time for the compressor state
+		#chEnableChangeTime = #Time;						-- set intitial Time for the chEnable state
+		#HPStateR = @Heatpump_State;						-- set Required Heat Pump state to current state
+		#HPStateP = @Heatpump_State;						-- set Previous Heat Pump state as well to current state
+		#OMR = @Operating_Mode_State;						-- set Required Operating Mode to current state
+		#OutsideTemp = @Outside_Temp;						-- set OusideTemp
+		#RoomSetpoint = min(max(?roomTempSet, 10), 22);				-- Room Setpoint
+		#RoomTemp = ?roomTemp;							-- Room Temperature. 2610.03 changed to use ?roomTemp
+		#WCS = @Z1_Heat_Request_Temp;						-- set initial Weather Compensation Setpoint to current @Z1_Heat_Request_Temp
+		if @Compressor_Freq > 18 then						-- set #CompState & #CompRunSec to values to indicate compressor is running during first boot
+			#CompState  = 2;						-- Compressor running state (0/1, 2 if already running during rules boot)
+			#TaPIStepTime = #Time;
+			#CompRunSec = 1999;						-- set #CompRunSec to 1999 to indicated Compressor was running during boot
+		else
+			#CompState  = 0;						-- set #CompState to 0 if compressor is not running during boot
+		end
+		if @ThreeWay_Valve_State then						-- set #DHWRun to 3 if HP is busy with DHW run during boot
+			#DHWRun = 3;
+		end
+		#chEnable = ?chEnable;							-- #chEnable is clean ?chEnable
+		#DHWTempP = @DHW_Temp;
+		setTimer(2,10);								-- timer for time reference.
+		setTimer(3,25);								-- TaSHifT function
+		setTimer(4,30);								-- OTT function
+		setTimer(5,35);								-- DHW function
+		setTimer(6,40);								-- PumpDuty function
+		setTimer(7,45);								-- QuietMode function
+		setTimer(8,50);								-- sync function
+		setTimer(9,55);								-- PID function
+		setTimer(10,22);							-- Compensation curve function
+    	else
+        	print('timer=1: waiting for HP/OT values');
+        	setTimer(1,5);
 	end
-	if @ThreeWay_Valve_State then									-- set #DHWRun to 3 if HP is busy with DHW run during boot
-		#DHWRun = 3;
-	end
-	#chEnable = ?chEnable;										-- #chEnable is clean ?chEnable
-	#DHWTempP = @DHW_Temp;
 end
 
 --[[
