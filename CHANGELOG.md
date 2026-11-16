@@ -1,5 +1,36 @@
 # Changelog
 
+## 2611.10 — 2026-11-16 (consistent style and documentation)
+
+**Documentation and formatting only relative to 2611.09.** This release consolidates the current active 16-Rule source; do not confuse this review with the functional PI changes introduced in 2611.08.
+
+- Adopt a consistent format for the complete **annotated source**, retaining all 16 existing Rules, their original order, timer scheduling, conditions and calculations.
+- Standardize Rule headers as `Purpose`, `Explanation`, `Result` and `Called by`, describing current behavior rather than accumulating historical change notes.
+- Remove obsolete and redundant inline comments. Keep short useful comments aligned in a fixed column **within each Rule**; use a separate comment above a block for non-obvious behavior.
+- Apply **8-column tab stops**, tabs only for code indentation and comment alignment, and an approximately **160-column maximum** per line. A different comment column is allowed for each Rule.
+- Keep release history in this changelog rather than in the annotated Rules. The commented source is the **single source of truth**; generate the loadable file via minify.
+- The waiting diagnostic uses `timer=1: waiting for HP/OT values` consistently in both files; this is a message-text normalization only.
+- Confirmed **3,371 identical executable tokens** between the submitted 2611.10 annotated source and loadable counterpart after diagnostic-string normalization. This checks source/minified consistency, **not** physical on-device behavior.
+- Update [README](README.md) and add the [Rules coding style](docs/RULES-CODING-STYLE.md) for future maintenance.
+
+## 2611.09 — 2026-11-15 (readability preparation)
+
+- Reintroduce local temporary variables to make complex expressions clearer; in particular, explicit PI parameters/limits in timer 9 and the four weather-curve points `$Ta1`, `$Ta2`, `$Tb1`, `$Tb2` in timer 10.
+- Preserve the established Rule ordering and timer cadence.
+- The re-expression of the weather curve was intended to preserve its original calculation. This was a preparatory readability release, later followed by the full style review in 2611.10.
+
+## 2611.08 — 2026-11-15 (PI integral contribution and limit corrected)
+
+**Functional controller update relative to 2611.07.**
+
+- In timer 9, retain `Kp = 1.2` but set **`Ki = 0.05` per five-minute update**, with no derivative term.
+- Redefine `#PIDintegral` as the integral **contribution in degrees Celsius** instead of an accumulated room-temperature error.
+- Clamp the integral contribution independently to **±5 °C** (`$Ilimit = 5`), while separately limiting the combined PI output to **±5 °C** (`$PIlimit = 5`). Changing `Ki` no longer silently changes the integral limit.
+- Previously, reducing `Ki` from 0.1 to 0.02 without changing the accumulated-error clamp of ±50 had inadvertently reduced the I contribution limit from ±5 °C to ±1 °C.
+- Retain conditional anti-windup and integrator hold across temporary interruptions/setpoint changes; the final correction is still rounded to whole degrees.
+- Use `* -1` in place of unary minus on Rules variables for compatibility with the Rules parser.
+- **Compatibility change:** the expanded local variables exceed the former 127-slot limit. A 2611.08 load test recorded 16 active Rules and **131/255 variable slots** on a compatible build; builds limited to 127 slots are no longer sufficient. GPIO33 support remains required.
+
 ## 2611.07 — 2026-11-15 (startup data-readiness guard)
 
 **Use input readiness rather than a fixed boot delay to initialize rule state.** This is the source provided as the author's current ruleset; dynamic behavior after the change still requires observation.
