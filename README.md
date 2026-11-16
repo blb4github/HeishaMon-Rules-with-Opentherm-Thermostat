@@ -2,7 +2,7 @@
 
 These are the rules I use to control a Panasonic heat pump with an OpenTherm thermostat. They are tailored to my installation; use them as inspiration and adapt the settings and integration to your own system.
 
-## Current version: 2611.10 (2026-11-16)
+## Current version: 2611.13 (2026-11-16)
 
 See [CHANGELOG.md](CHANGELOG.md) for the changes in each published version.
 
@@ -67,6 +67,19 @@ The guard is deliberately limited to those eight values; it is not a blanket rea
 
 **2611.10** is the agreed **style and documentation revision** of 2611.09. All 16 Rules retain their existing order, scheduling and executable control logic; changes are formatting and explanatory comments. Maintenance uses the annotated file as the single source of truth. The loadable file is generated with the [HeishaMon rules minifier](https://github.com/klaashoekstra94/heishamon_rules_minify). See [Rules coding style](docs/RULES-CODING-STYLE.md) for the formatting and documentation conventions.
 
+### TaShift refactor and DHW-safe PI control (2611.11–2611.13)
+
+**2611.13 is the current working version.** It retains the established compressor-start, defrost, outlet-temperature and Zone 2 safety behavior while reorganizing TaShift to respect the Rules engine's **255-instruction conditional-jump limit**:
+
+- `TaShift()` checks the existing heating/DHW/defrost gate, computes the effective `$WCS` once when the compressor is running, calculates the preliminary Zone 1 target, then calls `TaShift2($WCS)`.
+- `TaShift2($WCS)` handles the controlled PI handover, outlet-temperature corrections, direct Zone 2 override and final Zone 1 write. There are **17 Rules** in total (up from 16 in 2611.10). The two subrules were reported as 193 and 173 compiled instructions respectively; the conditional-jump check is a **per-jump** limit, not a maximum total ruleset size.
+- The first PI step can occur after 2 minutes when compressor frequency is at or below `#CompFreqTarget`, or after 15 minutes. Subsequent steps use 10 minutes at/below the frequency target or a 15-minute escape, with at most 1 °C change per accepted step. The existing outlet and Zone 2 safeguards still apply.
+- `timer=9` **holds both the integral and PI output** during DHW and while Evohome temporarily presents its 12 °C OFF setpoint. Integration resumes only when DHW is finished, the three-way valve is back in heating position and the normal setpoint has returned.
+- After a Rules-managed DHW cycle finishes, `timer=5` resets `#TaPIStepTime`, `#TaDeltaTimer` and `#TaDelta` to restart the PI handover and outlet overshoot tracking cleanly.
+
+**Development history:** 2611.11 had an oversized conditional jump (about 360 instructions) and was rejected by a firmware build checking the 255-instruction limit. Version 2611.12 used an intermediate 24-Rule split; 2611.13 replaces that with the simpler two-part structure. Neither candidate supersedes the working 2611.13 ruleset.
+
+The author confirmed that **2611.13 is running on HeishaMon**. This is an on-device load/running confirmation, not a completed long-term heating, cooling and DHW validation. See [technical release notes](docs/TA-SHIFT-2611-13.md) and [CHANGELOG.md](CHANGELOG.md).
 ## OpenTherm room values
 
 The room setpoint and current room temperature are transported as their normal OpenTherm values instead of encoding room temperature in `maxRelativeModulation`.
@@ -86,7 +99,7 @@ Home Assistant therefore filters the raw living-room temperature before sending 
 
 ## Firmware requirements (GPIO33 and Rules variables)
 
-**Important:** this ruleset uses `gpio(33)` in timer 8 **and requires more than 127 Rules variable slots as of 2611.08**. Verify both features in the firmware actually installed; the version label alone is insufficient. The 2611.08 load log showed 131/255 slots on a suitable build. Confirm GPIO support before using HEMS Dim mode.
+**Important:** this ruleset uses `gpio(33)` in timer 8 **and requires more than 127 Rules variable slots as of 2611.08**. Conditional jumps must also fit the Rules bytecode's 255-instruction offset; use firmware that detects and rejects oversized conditional jumps rather than silently accepting a corrupted control path. Verify both features in the firmware actually installed; the version label alone is insufficient. The 2611.08 load log showed 131/255 slots on a suitable build. Confirm GPIO support before using HEMS Dim mode.
 
 **Earlier compatible custom firmware release (historical reference):** [HeishaMon Large – GPIO + synchronous webserver (`blb4-gpio-webserver-1.0.0`)](https://github.com/blb4github/HeishaMon/releases/tag/blb4-gpio-webserver-1.0.0). This is an author's pre-release build with extended GPIO support, built from commit [`20df324`](https://github.com/blb4github/HeishaMon/commit/20df32456cdb5a189d614e9424b73c099a19f5dd) and published with the firmware artifact `Heishamon-firmware-Alpha-20df324.zip`. It provides the GPIO functionality needed for the Rules 2610.08 and later HEMS Dim feature. It also contains experimental improvements to the synchronous webserver; it is **not an official upstream HeishaMon release**.
 
@@ -123,7 +136,7 @@ This is **an initialisation-order guard**, not a three-minute ban on lowering th
 
 1. Save a copy of your existing rules and check the settings and integration above.
 2. Load the contents of `HeishaMon_Rules_BlB4.lua` into the HeishaMon rules editor, without Markdown fences.
-3. Check the boot log for `BLB Heishamon_rules_2611.10.lua`. If some inputs are not ready, look for `timer=1: waiting for HP/OT values` and confirm the periodic timers start once initialization succeeds. Check the Rules engine supports more than 127 variable slots and `gpio(33)`.
+3. Check the boot log for `BLB Heishamon_rules_2611.13.lua`. If some inputs are not ready, look for `timer=1: waiting for HP / OT values` and confirm the periodic timers start once initialization succeeds. Check the Rules engine supports more than 127 variable slots and `gpio(33)`.
 4. Verify that `#OutsideTemp` and `#HPStateP` are numeric, `?roomTempSet` and `?roomTemp` contain the intended values, and unwanted repeated `@SetHeatpump` commands do not occur.
 5. Monitor real operation, including heat-pump starts, compressor frequency, target temperature and defrosts. A successful load does not by itself validate physical control behavior.
 

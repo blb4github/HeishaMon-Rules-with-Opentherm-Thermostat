@@ -57,7 +57,8 @@ Do **not** add comments that simply repeat obvious code (for example, `setTimer(
 2. For style-only edits, compare **executable tokens** with the preceding source and check that no expressions, commands, string literals, variables or conditions changed.
 3. Minify from that accepted source. Confirm that the generated file contains the same executable tokens. Minification may change whitespace, but not code semantics; literal diagnostic strings should also match.
 4. Check the installed HeishaMon build supports both `gpio(33)` and **more than 127 Rules variable slots** for versions 2611.08 onward.
-5. Review the Rules load log, slot/memory totals and runtime behavior separately. Successful minification or token comparison does not prove safe device behavior.
-6. Document changed behavior in `CHANGELOG.md`, update `README.md` as required and submit a pull request for review. Do not merge unreviewed changes.
+5. Check conditional-jump offsets against the bytecode's **255-instruction limit**; this is independent of the 255-variable-slot capacity. Where supported, require a compile-time failure rather than accepting a truncated jump. See [2611.13 notes](TA-SHIFT-2611-13.md).
+6. Review the Rules load log, slot/memory totals and runtime behavior separately. Successful minification or token comparison does not prove safe device behavior.
+7. Document changed behavior in `CHANGELOG.md`, update `README.md` as required and submit a pull request for review. Do not merge unreviewed changes.
 
 This guide describes the **2611.10 style baseline** and should evolve only by explicit agreement, not incidentally during functional modifications.
