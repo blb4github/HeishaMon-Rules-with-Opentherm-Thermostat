@@ -2,14 +2,14 @@
 
 These are the rules I use to control a Panasonic heat pump with an OpenTherm thermostat. They are tailored to my installation; use them as inspiration and adapt the settings and integration to your own system.
 
-## Current version: 2611.07 (2026-11-15)
+## Current version: 2611.10 (2026-11-16)
 
 See [CHANGELOG.md](CHANGELOG.md) for the changes in each published version.
 
 | File | Purpose |
 | --- | --- |
-| [HeishaMon_Rules_BlB4.lua](HeishaMon_Rules_BlB4.lua) | Ready-to-load rules without comments |
-| [HeishaMon_Rules_BlB4_commented.lua](HeishaMon_Rules_BlB4_commented.lua) | Readable source with explanations; minify before loading |
+| [HeishaMon_Rules_BlB4.lua](HeishaMon_Rules_BlB4.lua) | Generated, ready-to-load rules (minified from the annotated source) |
+| [HeishaMon_Rules_BlB4_commented.lua](HeishaMon_Rules_BlB4_commented.lua) | **Canonical, documented source**; make maintenance changes here and minify before loading |
 
 The `.lua` extension is a filename convention: these files use the **HeishaMon rules language**, including `on ... then`, `@`, `#`, `$` and `?` variables. They are not standard Lua programs.
 
@@ -34,9 +34,9 @@ The `.lua` extension is a filename convention: these files use the **HeishaMon r
 7. Control cooling using Home Assistant/OpenTherm enable and water-temperature requests.
 8. Handle the weekly clock rollover in compressor and thermostat elapsed-time calculations.
 
-### TaShift/PI handover in 2611.06
+### TaShift/PI handover (introduced in 2611.06)
 
-Rules 2611.06 combine the established 2610.08 compressor-start and defrost behavior with the room-temperature PI controller from 2611.01 (timer 9, P=1.2, I=0.02 per five-minute cycle, no D). The heating target is transferred toward the weather-compensation-plus-PI request in **steps of at most 1 °C**. Each step requires the compressor frequency to be at or below `#CompFreqTarget` after at least two minutes, **or** a newly started 15-minute timeout since the last step. Outlet overshoot safeguards and direct Zone 2 request overrides remain in place.
+Historically, Rules 2611.06 combined the established 2610.08 compressor-start and defrost behavior with the room-temperature PI controller from 2611.01 (timer 9, P=1.2, I=0.02 per five-minute cycle, no D). The heating target is transferred toward the weather-compensation-plus-PI request in **steps of at most 1 °C**. Each step requires the compressor frequency to be at or below `#CompFreqTarget` after at least two minutes, **or** a newly started 15-minute timeout since the last step. Outlet overshoot safeguards and direct Zone 2 request overrides remain in place.
 
 The preceding 2611.05 candidate could not be loaded because it exceeded the Rules engine's **127-variable limit**; 2611.06 removed redundant state/temporary variables. The author confirmed that 2611.06 loaded and heated the home, and merged the fix. See [2611.06 technical notes](docs/TA-SHIFT-2611-06-REVIEW.md).
 
@@ -52,6 +52,20 @@ Version 2611.07 addresses the initialization race:
 - After successful initialization, it schedules timers 2–10 in their **existing order and original normal-boot cadence**. The application logic, TaShift and PI controller are unchanged.
 
 The guard is deliberately limited to those eight values; it is not a blanket readiness test for every heat-pump register. See [2611.07 startup notes](docs/STARTUP-2611-07.md) and [CHANGELOG.md](CHANGELOG.md).
+
+### PI correction and readability updates (2611.08–2611.10)
+
+**2611.08 changed the actual controller behavior** (compared with 2611.07):
+
+- `timer=9` uses `Kp = 1.2` and **`Ki = 0.05` per five-minute sample**; it is a PI controller without a derivative term.
+- `#PIDintegral` now stores the **I contribution itself in degrees Celsius of heating-target correction**, not the accumulated room-temperature error. The integral is independently limited to **±5 °C**, regardless of `Ki`. The **total PI correction** is also limited to **±5 °C**.
+- Conditional anti-windup avoids integrating further into total-output saturation while allowing the integral to unwind when conditions permit. The integral is retained when room heating is unavailable, during DHW or defrost interruptions and across setpoint changes. The final PI correction is rounded to whole degrees.
+- The prior `Ki = 0.02` with an accumulated-error clamp of ±50 had inadvertently limited the integral contribution to ±1 °C. These independent limits correct that coupling.
+- Versions **2611.08 and later require a Rules engine with more than 127 variable slots**, as well as support for `gpio(33)`. A successful Rules load was observed with 131/255 slots in the 2611.08 test; it does not guarantee compatibility with other firmware builds.
+
+**2611.09** reintroduced descriptive local variables, including `Kp`, `Ki`, the independent PI/I limits and four weather-compensation curve parameters (`Ta1`, `Ta2`, `Tb1`, `Tb2`). These improve readability without an intended change to the underlying weather-curve formula.
+
+**2611.10** is the agreed **style and documentation revision** of 2611.09. All 16 Rules retain their existing order, scheduling and executable control logic; changes are formatting and explanatory comments. Maintenance uses the annotated file as the single source of truth. The loadable file is generated with the [HeishaMon rules minifier](https://github.com/klaashoekstra94/heishamon_rules_minify). See [Rules coding style](docs/RULES-CODING-STYLE.md) for the formatting and documentation conventions.
 
 ## OpenTherm room values
 
@@ -70,9 +84,9 @@ In this installation the Evohome/ramses room-temperature value occasionally show
 
 Home Assistant therefore filters the raw living-room temperature before sending it to the OTGW with `RT=`. The current setup uses a Home Assistant `filter` sensor with a `lowpass` filter, `time_constant: 15` and `precision: 2`, and the OTGW automation rounds the filtered result to 0.1 °C before sending it. This filtering is installation-specific and is not part of the HeishaMon rules themselves.
 
-## Firmware requirements for GPIO33
+## Firmware requirements (GPIO33 and Rules variables)
 
-**Important:** this ruleset uses `gpio(33)` in timer 8. This requires a firmware build whose Rules engine implements GPIO access, not merely any firmware labeled 4.4.0. Confirm support on your hardware/build before using HEMS Dim mode.
+**Important:** this ruleset uses `gpio(33)` in timer 8 **and requires more than 127 Rules variable slots as of 2611.08**. Verify both features in the firmware actually installed; the version label alone is insufficient. The 2611.08 load log showed 131/255 slots on a suitable build. Confirm GPIO support before using HEMS Dim mode.
 
 **Earlier compatible custom firmware release (historical reference):** [HeishaMon Large – GPIO + synchronous webserver (`blb4-gpio-webserver-1.0.0`)](https://github.com/blb4github/HeishaMon/releases/tag/blb4-gpio-webserver-1.0.0). This is an author's pre-release build with extended GPIO support, built from commit [`20df324`](https://github.com/blb4github/HeishaMon/commit/20df32456cdb5a189d614e9424b73c099a19f5dd) and published with the firmware artifact `Heishamon-firmware-Alpha-20df324.zip`. It provides the GPIO functionality needed for the Rules 2610.08 and later HEMS Dim feature. It also contains experimental improvements to the synchronous webserver; it is **not an official upstream HeishaMon release**.
 
@@ -109,11 +123,11 @@ This is **an initialisation-order guard**, not a three-minute ban on lowering th
 
 1. Save a copy of your existing rules and check the settings and integration above.
 2. Load the contents of `HeishaMon_Rules_BlB4.lua` into the HeishaMon rules editor, without Markdown fences.
-3. Check the boot log for `BLB Heishamon_rules_2611.07.lua`. If some inputs are not ready, look for `timer=1: waiting for HP / OT values` and confirm the periodic timers start once initialization succeeds.
+3. Check the boot log for `BLB Heishamon_rules_2611.10.lua`. If some inputs are not ready, look for `timer=1: waiting for HP/OT values` and confirm the periodic timers start once initialization succeeds. Check the Rules engine supports more than 127 variable slots and `gpio(33)`.
 4. Verify that `#OutsideTemp` and `#HPStateP` are numeric, `?roomTempSet` and `?roomTemp` contain the intended values, and unwanted repeated `@SetHeatpump` commands do not occur.
 5. Monitor real operation, including heat-pump starts, compressor frequency, target temperature and defrosts. A successful load does not by itself validate physical control behavior.
 
-For edits, work in `HeishaMon_Rules_BlB4_commented.lua`, then generate the ready-to-load file using the [HeishaMon rules minifier](https://github.com/klaashoekstra94/heishamon_rules_minify). Keep both files in sync.
+For edits, work **only** in `HeishaMon_Rules_BlB4_commented.lua`, then generate `HeishaMon_Rules_BlB4.lua` using the [HeishaMon rules minifier](https://github.com/klaashoekstra94/heishamon_rules_minify). Do not maintain the two files independently. Confirm executable equivalence after minification and review the [coding style](docs/RULES-CODING-STYLE.md).
 
 > Usage is at your own risk. These are personal control rules, including installation-specific heating, cooling and hot-water settings.
 
