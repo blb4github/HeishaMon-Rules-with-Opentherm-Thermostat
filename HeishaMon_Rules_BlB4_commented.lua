@@ -12,6 +12,7 @@ Operation:	Startup state is initialized in timer=1, after required inputs exist.
 
 Installation:	Use the commented file for maintenance. Apply the minify tool when producing the firmware-loadable version.
 ]]
+
 --[[
 System#Boot
 Purpose:	Initialize persistent controller state and start the input-readiness check.
@@ -22,7 +23,7 @@ Result:		Selected # state variables; starts timer=1.
 Called by:	System boot; timer=1 is first scheduled after 10 seconds.
 rule 01]]
 on System#Boot then
-	print('BLB Heishamon_rules_2611.10.lua');
+	print('BLB Heishamon_rules_2611.13.lua');
 	-- Initialize state without reading unavailable boot-time inputs.
 	#chEnableOnMin = -1;					-- Signed minutes: on > 0, off < 0
 	#chEnableChangeTime = -1;
@@ -97,7 +98,7 @@ on timer=1 then
 		setTimer(10,22);
 	else
 		-- Retry without scheduling dependent Rules.
-		print('timer=1: waiting for HP/OT values');
+		print('timer=1: waiting for HP / OT values');
 		setTimer(1,5);
 	end
 end
@@ -188,15 +189,13 @@ end
 
 
 --[[
-TaShift: Heating target management
-Purpose:	Calculate and send the zone-1 heating request temperature.
-Explanation:	The weather-compensated #WCS is adjusted for the optional zone-2 request. During a compressor run, room PI correction and outlet-temperature
-		overshoot protection influence #SHifT. When stopped, time-of-day and room-temperature conditions determine a reduced or neutral shift. Shift is
-		clamped to +/-5 C. The controlled PI transfer allows at most one degree per accepted step, with a compressor-frequency check after two minutes
-		or a 15-minute escape for each step. #TaPIStepTime is both phase marker (-1 = startup) and timestamp. High outlet temperature can require
-		additional one-degree safety steps. Zone-2 requests above 25 C override the calculated zone-1 target.
-Result:		#SHifT, #Z1HRT and possibly @SetZ1HeatRequestTemperature.
-Called by:	@Main_Outlet_Temp or timer=3; implementation is in this named Rule.
+TaShift: Heating target management (part 1 of 2)
+Purpose:	Validate heating conditions and calculate the initial zone-1 request.
+Explanation:	Preserves the original 2611.11 DHW/defrost gate, compressor-start logic, WAR-adjusted $WCS, outlet overshoot protection and baseline request.
+		$WCS is calculated once while the compressor runs and passed unchanged to TaShift2. With the compressor stopped, $WCS is NULL.
+		The short TaShift2 call removes the oversized conditional jump while preserving the original decision sequence.
+Result:		#SHifT and preliminary #Z1HRT; invokes TaShift2($WCS) in valid heating conditions.
+Called by:	@Main_Outlet_Temp and timer=3.
 rule 07]]
 on TaShift then
 	-- After defrost, require a new PI handover rather than reusing the old phase.
@@ -247,47 +246,7 @@ on TaShift then
 		if #CompState > 0 then
 			#Z1HRT = min(#Z1HRT, max($WCS - 5, ceil(@Main_Outlet_Temp) - 1));
 		end
-		-- Handover from startup to PI-controlled targets; Z2 direct override bypasses it.
-		if #CompState > 0 && @Defrosting_State == 0 && @Z2_Heat_Request_Temp <= 25 then
-			-- An active PI phase holds the current request until a step is approved.
-			if #TaPIStepTime >= 0 then
-				#Z1HRT = @Z1_Heat_Request_Temp;
-			end
-			-- Each accepted PI step is capped at 1 C; the 15-minute escape restarts per step.
-			if (#OutsideTemp <= 7 || #CompRunSec >= 130 || #CompRunSec == -1) && ((#TaPIStepTime < 0 &&
-					(#CompRunMin >= 15 || (#CompRunMin >= 2 && @Compressor_Freq <= #CompFreqTarget))) || (#TaPIStepTime >= 0 &&
-					((#Time - #TaPIStepTime + 10080) % 10080 >= 15 || ((#Time - #TaPIStepTime + 10080) % 10080 >= 2 &&
-					@Compressor_Freq <= #CompFreqTarget)))) then
-				if $WCS + #RoomTempControl > @Z1_Heat_Request_Temp then
-					#Z1HRT = min(@Z1_Heat_Request_Temp + 1, $WCS + #RoomTempControl);
-				elseif $WCS + #RoomTempControl < @Z1_Heat_Request_Temp && @Main_Outlet_Temp <= @Z1_Heat_Request_Temp + 0.8 then
-					#Z1HRT = max(@Z1_Heat_Request_Temp - 1, $WCS + #RoomTempControl);
-				else
-					#Z1HRT = @Z1_Heat_Request_Temp;
-				end
-				-- Reset the wait interval only when PI starts or a target step is accepted.
-				if #TaPIStepTime < 0 || #Z1HRT != @Z1_Heat_Request_Temp then
-					#TaPIStepTime = #Time;
-				end
-			end
-			if #TaPIStepTime >= 0 then
-				if #TaDeltaTimer >= 80 && ceil(@Main_Outlet_Temp - 1.8) > @Z1_Heat_Request_Temp then
-					#Z1HRT = max(#Z1HRT, min(@Z1_Heat_Request_Temp + 1, ceil(@Main_Outlet_Temp - 1.8)));
-					#TaPIStepTime = #Time;
-				end
-				if #TaDelta >= 3 && ceil(@Main_Outlet_Temp) - 2 > @Z1_Heat_Request_Temp then
-					#Z1HRT = max(#Z1HRT, min(@Z1_Heat_Request_Temp + 1, ceil(@Main_Outlet_Temp) - 2));
-					#TaPIStepTime = #Time;
-				end
-			end
-		end
-		-- A direct zone-2 request takes priority over PI target management.
-		if @Z2_Heat_Request_Temp > 25 then
-			#Z1HRT = @Z2_Heat_Request_Temp;
-		end
-		if #Z1HRT != @Z1_Heat_Request_Temp then
-			@SetZ1HeatRequestTemperature = #Z1HRT;
-		end
+		TaShift2($WCS);
 	end
 end
 
@@ -414,6 +373,10 @@ on timer=5 then
 				#HPStateR = #HPStateP;
 				#HPStateP = 1;
 				#DHWRun = 0;					-- DHW cycle fully finished
+				-- Start heating after DHW with a fresh PI handover and overshoot state.
+				#TaPIStepTime = -1;
+				#TaDeltaTimer = 0;
+				#TaDelta = 0;
 			end
 		end
 		if %day == (#DHWSterilizationDay -10) && %hour > 15 then
@@ -622,9 +585,10 @@ end
 timer=9: PI room correction for TaShift
 Purpose:	Calculate room-temperature PI correction relative to #WCS.
 Explanation:	#RoomTempDelta is actual room temperature minus setpoint; positive $RoomError means the room is too cold. Kp = 1.2; Ki = 0.05 per five minutes.
-		#PIDintegral is the I contribution in degrees C, not accumulated room error. Both the integral and total PI correction are limited to +/-5 C
-		independently of the gain. Conditional integration prevents saturation windup, while allowing recovery. Integration pauses during unavailable
-		space heating, DHW diversion, defrost and room overshoot, but the integral is retained. The final PI output is rounded to whole degrees.
+		#PIDintegral is the I contribution in degrees C, not accumulated room error. Both integral and total PI output are limited to +/-5 C. The entire
+		PI calculation pauses during DHW or while Evohome's temporary 12 C OFF setpoint is active; the previous output and integral are held. Normal
+		room demand resumes only when the valve is back in heating position and the normal setpoint returns. Conditional integration limits windup;
+		during other temporary heating interruptions, the P output still follows room error while the I contribution is held.
 Result:		#PIDintegral and #RoomTempControl (degrees C).
 Called by:	Scheduled from timer=1 after 55 seconds; repeats every 300 seconds.
 rule 13]]
@@ -635,21 +599,25 @@ on timer=9 then
 	$Ki = 0.05;									-- Integral gain per five-minute sample
 	$Ilimit = 5;									-- Maximum I contribution in C
 	$PIlimit = 5;									-- Maximum total PI correction in C
-	$RoomError = #RoomTempDelta * -1;
-	$PIp = $Kp * $RoomError;
-	-- Integrate only while room heating is considered available.
-	if #chEnable == 1 && #Heat == 1 && #DHWRun < 2 && @ThreeWay_Valve_State == 0 && @Defrosting_State == 0 && #RoomTempDelta <= 0.2 then
-		-- Store the I contribution itself, always limited to +/-5 C.
-		$PIintegralNext = min(max(#PIDintegral + $Ki * $RoomError, $Ilimit * -1), $Ilimit);
-		$PIcandidate = $PIp + $PIintegralNext;
-		-- Conditional anti-windup allows unwinding but blocks further saturation.
-		if ($PIcandidate <= $PIlimit || $RoomError <= 0) && ($PIcandidate >= $PIlimit * -1 || $RoomError >= 0) then
-			#PIDintegral = $PIintegralNext;
+	-- Evohome is temporarily OFF (12 C) during DHW: hold both I state and PI output.
+	-- Resume only after the valve is back, DHW has finished and the normal setpoint is restored.
+	if #DHWRun < 1 && @ThreeWay_Valve_State == 0 && ?roomTempSet > 12 && #RoomSetpoint > 12 then
+		$RoomError = #RoomTempDelta * -1;
+		$PIp = $Kp * $RoomError;
+		-- Integrate only while room heating is considered available.
+		if #chEnable == 1 && #Heat == 1 && #DHWRun < 2 && @ThreeWay_Valve_State == 0 && @Defrosting_State == 0 && #RoomTempDelta <= 0.2 then
+			-- Store the I contribution itself, always limited to +/-5 C.
+			$PIintegralNext = min(max(#PIDintegral + $Ki * $RoomError, $Ilimit * -1), $Ilimit);
+			$PIcandidate = $PIp + $PIintegralNext;
+			-- Conditional anti-windup allows unwinding but blocks further saturation.
+			if ($PIcandidate <= $PIlimit || $RoomError <= 0) && ($PIcandidate >= $PIlimit * -1 || $RoomError >= 0) then
+				#PIDintegral = $PIintegralNext;
+			end
 		end
+		-- The I contribution is held during interruptions and setpoint changes.
+		$PIoutput = $PIp + #PIDintegral;
+		#RoomTempControl = round(min(max($PIoutput, $PIlimit * -1), $PIlimit));		-- Rounded correction for TaShift
 	end
-	-- The I contribution is held during interruptions and setpoint changes.
-	$PIoutput = $PIp + #PIDintegral;
-	#RoomTempControl = round(min(max($PIoutput, $PIlimit * -1), $PIlimit));		-- Rounded correction for TaShift
 end
 
 
@@ -706,5 +674,58 @@ on timer=12 then
 	if #TaDeltaTimer < 200 && #TaDelta >= 2 then
 		#TaDeltaTimer = #TaDeltaTimer + 10;
 		setTimer(12, 10);
+	end
+end
+
+
+--[[
+TaShift2: Heating target management (part 2 of 2)
+Purpose:	Apply PI handover, 1 C target steps, outlet safety corrections and the zone-2 priority; send the zone-1 request.
+Explanation:	Receives $WCS from TaShift rather than recalculating it. The existing 10/15-minute PI step timing and original 2611.11
+		control expressions are retained. $WCS is only used when #CompState > 0; the compressor-off path uses the precomputed #Z1HRT.
+Result:		Final #Z1HRT, possible @SetZ1HeatRequestTemperature and PI-step state updates.
+Called by:	TaShift via TaShift2($WCS) when heating is eligible.
+rule 17]]
+on TaShift2($WCS) then
+	-- Handover from startup to PI-controlled targets; Z2 direct override bypasses it.
+	if #CompState > 0 && @Defrosting_State == 0 && @Z2_Heat_Request_Temp <= 25 then
+		-- An active PI phase holds the current request until a step is approved.
+		if #TaPIStepTime >= 0 then
+			#Z1HRT = @Z1_Heat_Request_Temp;
+		end
+		-- Each accepted PI step is capped at 1 C; the 15-minute escape restarts per step.
+		if (#OutsideTemp <= 7 || #CompRunSec >= 130 || #CompRunSec == -1) && ((#TaPIStepTime < 0 &&
+				(#CompRunMin >= 15 || (#CompRunMin >= 2 && @Compressor_Freq <= #CompFreqTarget))) || (#TaPIStepTime >= 0 &&
+				((#Time - #TaPIStepTime + 10080) % 10080 >= 15 || ((#Time - #TaPIStepTime + 10080) % 10080 >= 10 &&
+				@Compressor_Freq <= #CompFreqTarget)))) then
+			if $WCS + #RoomTempControl > @Z1_Heat_Request_Temp then
+				#Z1HRT = min(@Z1_Heat_Request_Temp + 1, $WCS + #RoomTempControl);
+			elseif $WCS + #RoomTempControl < @Z1_Heat_Request_Temp && @Main_Outlet_Temp <= @Z1_Heat_Request_Temp + 0.8 then
+				#Z1HRT = max(@Z1_Heat_Request_Temp - 1, $WCS + #RoomTempControl);
+			else
+				#Z1HRT = @Z1_Heat_Request_Temp;
+			end
+			-- Reset the wait interval only when PI starts or a target step is accepted.
+			if #TaPIStepTime < 0 || #Z1HRT != @Z1_Heat_Request_Temp then
+				#TaPIStepTime = #Time;
+			end
+		end
+		if #TaPIStepTime >= 0 then
+			if #TaDeltaTimer >= 80 && ceil(@Main_Outlet_Temp - 1.8) > @Z1_Heat_Request_Temp then
+				#Z1HRT = max(#Z1HRT, min(@Z1_Heat_Request_Temp + 1, ceil(@Main_Outlet_Temp - 1.8)));
+				#TaPIStepTime = #Time;
+			end
+			if #TaDelta >= 3 && ceil(@Main_Outlet_Temp) - 2 > @Z1_Heat_Request_Temp then
+				#Z1HRT = max(#Z1HRT, min(@Z1_Heat_Request_Temp + 1, ceil(@Main_Outlet_Temp) - 2));
+				#TaPIStepTime = #Time;
+			end
+		end
+	end
+	-- A direct zone-2 request takes priority over PI target management.
+	if @Z2_Heat_Request_Temp > 25 then
+		#Z1HRT = @Z2_Heat_Request_Temp;
+	end
+	if #Z1HRT != @Z1_Heat_Request_Temp then
+		@SetZ1HeatRequestTemperature = #Z1HRT;
 	end
 end

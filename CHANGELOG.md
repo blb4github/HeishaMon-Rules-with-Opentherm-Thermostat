@@ -1,5 +1,30 @@
 # Changelog
 
+## 2611.13 — 2026-11-16 (two-part TaShift, PI handover and DHW safeguards)
+
+**Current working ruleset.** The author confirmed that 2611.13 loads and runs on HeishaMon; extended operational validation is not implied.
+
+- Replace the interim 24-Rule split with **17 Rules**: `TaShift` handles the heating/DHW/defrost gate, compressor-start logic, effective weather baseline and preliminary target, then calls `TaShift2($WCS)` for controlled PI handover, outlet safeguards, Zone 2 priority and the final target write.
+- Calculate the local WAR-adjusted `$WCS` **once** in `TaShift` while the compressor runs and pass it to `TaShift2` as a Rule argument. The compressor-off path retains the `coalesce($WCS, #WCS)` baseline fallback.
+- Keep the established original DHW/defrost gate (`#Heat == 1`, three-way valve in heating position, `#DHWRun < 2`, `#NoDefrost == 1`), rather than the temporary extra TaShift/DHW conditions from 2611.12.
+- Keep the PI handover's at-most-1 °C accepted target steps. The initial step uses at least 2 minutes with low compressor frequency, or 15 minutes; **subsequent** low-frequency steps use at least **10 minutes** and the fallback remains **15 minutes**.
+- In timer 9, hold both `#PIDintegral` and `#RoomTempControl` during DHW and Evohome's temporary 12 °C OFF setpoint. Permit PI updates again when the valve is back in heating position, DHW has ended and `?roomTempSet`/`#RoomSetpoint` are above 12 °C.
+- When a Rules-initiated DHW cycle finishes normally, reset `#TaPIStepTime = -1`, `#TaDeltaTimer = 0` and `#TaDelta = 0` before normal heating resumes.
+- Keep the established startup, cooling, circulation pump, Quiet Mode and GPIO33 logic. Change the source's waiting-message spacing to match the **author-supplied and tested loadable file** (`timer=1: waiting for HP / OT values`); this is diagnostic text only.
+- The prior compilation review reported 193 instructions in `TaShift` and 173 in `TaShift2`, avoiding the 255-instruction conditional-jump overflow. The uploaded annotated and loadable 2611.13 files were checked for matching executable tokens after the diagnostic normalization.
+- Update README and add [technical release notes](docs/TA-SHIFT-2611-13.md).
+
+## 2611.12 — 2026-11-16 (intermediate local candidate; superseded)
+
+- Split the oversized TaShift logic across a supervisory Rule and eight helpers (24 Rules in total).
+- Add DHW/temporary 12 °C-setpoint PI suspension and post-DHW PI/overshoot reset; those protective behaviors were retained in 2611.13.
+- Superseded before repository publication by the simpler 2611.13 structure. Do not use as the current version.
+
+## 2611.11 — 2026-11-16 (local candidate; rejected by firmware jump check)
+
+- Expanded TaShift exceeded the Rules engine's **255-instruction conditional-jump offset** (approximately 360 compiled instructions for the combined Rule); this is separate from the expanded 255-variable-slot table.
+- The firmware check correctly rejected loading 2611.11 and retained the previously active Rules. An unchecked overlong jump risks bypassing intended DHW safety conditions.
+- Not a usable release; replaced by the split-rule approach in 2611.12 and 2611.13.
 ## 2611.10 — 2026-11-16 (consistent style and documentation)
 
 **Documentation and formatting only relative to 2611.09.** This release consolidates the current active 16-Rule source; do not confuse this review with the functional PI changes introduced in 2611.08.
