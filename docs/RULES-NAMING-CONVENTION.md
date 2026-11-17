@@ -1,6 +1,6 @@
 # HeishaMon Rules — variable naming design criteria
 
-**Status:** Criteria from PR #13 approved; prefix conventions in PR #14 proposed; individual variable renames remain unapproved.
+**Status:** NC-01–NC-12 and prefix grouping proposed in PR #14; the author has now selected all 64 names in the linked inventory (55 Rename, 6 Change, 3 unchanged). Code implementation is a separate step.
 **Reference ruleset:** 2611.13.
 **Scope:** Naming and documentation of user-defined global (`#`) and local (`$`) variables. This document does **not** authorize any renaming.
 
@@ -70,7 +70,7 @@ The goal is **consistent, compact, meaningful naming** without changes to heat-p
 5. **Minifier and strings:** the loadable file is derived from the commented canonical source. The minifier is known to insert spaces around `/` even inside a diagnostic string (e.g. `HP/OT` becomes `HP / OT`). Handle this separately from variable-rename verification; do not silently adjust control semantics.
 6. **Rollback:** preserve working Rules 2611.13 and the validated firmware as a reproducible reference until a renamed version has passed tests.
 
-The [2611.13 variable inventory](RULES-NAMING-INVENTORY-2611-13.md) provides all proposed names by prefix group. Each proposed rename remains subject to an individual Rename / Keep / Defer decision.
+The [2611.13 variable inventory](RULES-NAMING-INVENTORY-2611-13.md) contains the original prefix-group proposals and the complete author's decision register. All 61 proposed changes have been decided; the six `Change` decisions specify an alternative final name.
 
 ## Review and decision process
 
