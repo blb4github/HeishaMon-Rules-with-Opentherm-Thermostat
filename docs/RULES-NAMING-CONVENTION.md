@@ -30,6 +30,7 @@ The goal is **consistent, compact, meaningful naming** without changes to heat-p
 - **Time terminology:** a timestamp could use `ChangeTime` or `StartTime`; elapsed time could use `RunTime`, `ElapsedMin`, or `StateMin`. Neither `Duration` nor `WeekMin` is compulsory.
 
 **Review priority:** semantic correctness and consistency **within a functional group**, then compactness/readability of complete expressions, and only then cosmetic uniformity.
+
 ### Scope exclusions and exceptions
 
 - `@...` (HeishaMon heat-pump interface), `?...` (OpenTherm interface), `%...` time/runtime values, Rule event names, built-in functions and their signatures are **not renamed** by this convention.
@@ -46,7 +47,7 @@ The goal is **consistent, compact, meaningful naming** without changes to heat-p
 5. **Minifier and strings:** the loadable file is derived from the commented canonical source. The minifier is known to insert spaces around `/` even inside a diagnostic string (e.g. `HP/OT` becomes `HP / OT`). Handle this separately from variable-rename verification; do not silently adjust control semantics.
 6. **Rollback:** preserve working Rules 2611.13 and the validated firmware as a reproducible reference until a renamed version has passed tests.
 
-The [2611.13 variable inventory](RULES-NAMING-INVENTORY-2611-13.md) was created before these refinements. Its name proposals and A/B/C labels are **provisional** until reassessed by functional group; the 64-variable raw inventory remains useful.
+The [2611.13 variable inventory](RULES-NAMING-INVENTORY-2611-13.md) has now been **reassessed by functional group** against the refined criteria. Its 64 names and suggested replacements are **review proposals only**; all individual Rename / Keep / Defer decisions remain pending.
 
 ## Review and decision process
 
