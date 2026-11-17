@@ -30,19 +30,19 @@ on System#Boot then
 	#chEnableChangeTime = -1;
 	#otCHOffStartTime = -1;
 	#cpFreqTarget = -1;
-	#cpRunSec = -1;					-- Seconds; -1 means not yet known
-	#cpRunMin = -1;					-- Signed running/stopped minutes
-	#clEnable = -1;					-- Filtered cooling request
+	#cpRunSec = -1;						-- Seconds; -1 means not yet known
+	#cpRunMin = -1;						-- Signed running/stopped minutes
+	#clEnable = -1;						-- Filtered cooling request
 	-- Weekly DHW schedule defaults (1 = Sunday; 7 = Saturday).
 	#hwComfortDay = 4;					-- Optional comfort-day DHW check
 	#hwState = -1;						-- 0 idle, 1 finishing, 2 Rules DHW, 3 detected DHW
 	#hwSterilizationDay = 7;				-- Saturday by default
 	#hpHeatingMode = -1;
-	#hpModePrev = -1;						-- Saved operating mode during DHW
+	#hpModePrev = -1;					-- Saved operating mode during DHW
 	#qmReq = -1;						-- Requested quiet-mode level
 	-- Start the PI with no accumulated correction.
 	#piIntegral = 0;
-	#rtDelta = 0;					-- Actual room temperature minus setpoint
+	#rtDelta = 0;						-- Actual room temperature minus setpoint
 	#piCorrection = 0;
 	#piStepTime = -1;					-- -1 = PI handover not active
 	setTimer(1,10);
@@ -201,7 +201,7 @@ rule 07]]
 on TaShift then
 	-- After defrost, require a new PI handover rather than reusing the old phase.
 	if @Defrosting_State == 1 then
-		#piStepTime = -1;						-- Restart PI handover after defrost
+		#piStepTime = -1;									-- Restart PI handover after defrost
 	end
 	-- This gate also permits TaShift during defrost if pump flow is 5–30 l/min.
 	#taDefrostAllowed = @Defrosting_State == 0 || (@Pump_Flow > 5 && @Pump_Flow < 30);
@@ -269,31 +269,31 @@ on timer=4 then
 	if @Sterilization_State == 0 && #hwState < 2 then
 		-- Heating control is permitted only in normal room-heating conditions.
 		if #hpHeatingMode == 1 && @ThreeWay_Valve_State == 0 && @Defrosting_State == 0 then
-			$chOverNight = %hour > 22 || %hour < 3;					-- Night period: 23:00–02:59
+			$chOverNight = %hour > 22 || %hour < 3;									-- Night period: 23:00–02:59
 			$chRestartAllowed = #chEnable && #chStateMin > 60 && #cpRunMin < -60 && $chOverNight != 1;
 
 			-- Start heating when heat is requested and at least one room/outside temperature condition is met.
 			if #chEnable == 1 && (((#rtDelta < 0.2 || %hour == 7) && #hpOutsideTemp < 11) ||
 				(#rtDelta < 1 && #hpOutsideTemp < 2) || #rtDelta < 0 || ($chRestartAllowed == 1 && #rtDelta < 2)) &&
 				#hpStateReq != 1 then
-				#hpStateReq = 1;							-- Request heat pump ON
+				#hpStateReq = 1;										-- Request heat pump ON
 
 			-- Stop heating only when room-demand and compressor timing conditions
 			-- permit it; avoid unnecessary circulation-pump stops in cold weather.
 			elseif ((#rtDelta > 0.2 && %hour > 9) || #rtDelta > 1.5 || (#chEnable == 0 && #chStateMin < -30)) &&
 				(#cpRunMin > 60 || #cpState == 0 || $chOverNight) && (#hpOutsideTemp > 4 || (#chEnable == 0 && $chOverNight)) &&
 				$chRestartAllowed == 0 && #hpStateReq != 0 then
-				#hpStateReq = 0;							-- Request heat pump OFF
+				#hpStateReq = 0;										-- Request heat pump OFF
 				if #hpModeReq != 0 && #hpModeReq != 3 then
-					#hpModeReq = 0;						-- Return to heating mode unless in DHW-only mode
+					#hpModeReq = 0;										-- Return to heating mode unless in DHW-only mode
 				end
 			end
 		end
 
 		-- Cooling is handled separately from the heating conditions above.
-		$clEnable = max(round(#clEnable),0);					-- Use filtered cooling request
+		$clEnable = max(round(#clEnable),0);							-- Use filtered cooling request
 		if $clEnable == 1 then
-			#hpModeReq = 1;								-- Request cooling mode
+			#hpModeReq = 1;									-- Request cooling mode
 			#hpStateReq = 1;								-- Keep heat pump ON
 			$clOffset = 0;
 			if #cpState == 1 then
@@ -301,7 +301,7 @@ on timer=4 then
 			else
 				$clReqTempMin = 0;
 				if @Main_Outlet_Temp > (@Main_Target_Temp + 3) then
-					$clOffset = -2;					-- Lower cooling request when outlet is too warm
+					$clOffset = -2;							-- Lower cooling request when outlet is too warm
 				end
 			end
 
@@ -311,7 +311,7 @@ on timer=4 then
 				@SetZ1CoolRequestTemperature = $clReqTemp;
 			end
 		elseif $clEnable == 0 && #hpModeReq == 1 && #hwState < 2 && #cpState == 0 then
-			#hpModeReq = 0;								-- Leave cooling mode when compressor has stopped
+			#hpModeReq = 0;									-- Leave cooling mode when compressor has stopped
 			#hpStateReq = 0;								-- Request heat pump OFF
 		end
 	end
@@ -336,9 +336,9 @@ on timer=5 then
 		-- Default scheduled run, with summer and cold-weather time overrides.
 		$hwStartHour = 13;
 		if (%month > 3 && %month < 9) && %hour == 8 && #hpOutsideTemp > 20 then
-			$hwStartHour = 8;						-- Summer morning schedule
+			$hwStartHour = 8;								-- Summer morning schedule
 		elseif #hpOutsideTemp < 4 then
-			$hwStartHour = 0;						-- Cold-weather midnight schedule
+			$hwStartHour = 0;								-- Cold-weather midnight schedule
 		end
 		-- Extra DHW opportunities when tank temperature is substantially low.
 		$hwDeepLow = @DHW_Temp <= (@DHW_Target_Temp + @DHW_Heat_Delta - 10);
@@ -349,7 +349,7 @@ on timer=5 then
 		-- Start a new Rules-controlled DHW run only if the valve is in heating position.
 		if #hwState < 1 && @ThreeWay_Valve_State == 0 && ( ($hwDeepLow) || (%hour >= 9 && ($hwLowOrDrop)) ||
 			(%hour == $hwStartHour && ($hwScheduleEligible)) ) then
-			#hwState = 2;						-- Rules-initiated DHW run
+			#hwState = 2;									-- Rules-initiated DHW run
 			-- Save operating state and heat-pump state for restoration after DHW.
 			#hpModePrev = @Operating_Mode_State;
 			#hpStatePrev = @Heatpump_State;
@@ -367,13 +367,13 @@ on timer=5 then
 				@SetForceSterilization = 1;
 				#hwSterilizationDay = #hwSterilizationDay + 10;
 			elseif @ThreeWay_Valve_State == 0 && @DHW_Temp >= @DHW_Target_Temp && @Defrosting_State == 0 && @Sterilization_State == 1 then
-				#hwState = 1;					-- DHW finished; sterilization still active
+				#hwState = 1;								-- DHW finished; sterilization still active
 			elseif @ThreeWay_Valve_State == 0 && @DHW_Temp >= @DHW_Target_Temp && @Defrosting_State == 0 && @Sterilization_State == 0 then
 				#hpModeReq = max(0,#hpModePrev);
 				#hpModePrev = @Operating_Mode_State;
 				#hpStateReq = #hpStatePrev;
 				#hpStatePrev = 1;
-				#hwState = 0;					-- DHW cycle fully finished
+				#hwState = 0;								-- DHW cycle fully finished
 				-- Start heating after DHW with a fresh PI handover and overshoot state.
 				#piStepTime = -1;
 				#taDeltaSec = 0;
@@ -403,13 +403,13 @@ on timer=6 then
 	$puMaxDuty = 102 - 4 * @Heat_Delta;
 	-- DHW circulation requires high pump duty but less duty near completion.
 	if @ThreeWay_Valve_State == 1 then
-		$puMaxDuty = 140;				-- DHW circulation
+		$puMaxDuty = 140;												-- DHW circulation
 		if (@Sterilization_State == 0 && @DHW_Temp > @DHW_Target_Temp) || (@Sterilization_State == 1 && @DHW_Temp > 57) then
 			$puMaxDuty = $puMaxDuty - 10;
 		end
 	-- Cooling uses a fixed maximum pump duty.
 	elseif @Operating_Mode_State == 1 then
-		$puMaxDuty = 92;				-- Cooling
+		$puMaxDuty = 92;												-- Cooling
 	-- For heating, distinguish compressor idle from active circulation.
 	elseif @Heatpump_State == 1 then
 		if @Compressor_Freq == 0 && @Defrosting_State != 1 then
@@ -456,7 +456,7 @@ on timer=7 then
 	#cpFreqTarget = min(max(ceil(24 + (6 - #hpOutsideTemp) * 30 / 9), 24), 54);
 	-- Conditions where compressor limitation takes precedence.
 	if @Defrosting_State == 1 || #cpState < 1 || #cpRunMin < 5 || %hour < 7 || @Operating_Mode_State == 1 then
-		#qmReq = 3;					-- Maximum compressor limitation
+		#qmReq = 3;												-- Maximum compressor limitation
 	-- Select mode from frequency thresholds with hysteresis.
 	elseif @Compressor_Freq < #cpFreqTarget || (#qmReq == 0 && @Compressor_Freq < #cpFreqTarget + 6) then
 		#qmReq = 0;
@@ -465,12 +465,12 @@ on timer=7 then
 	elseif @Compressor_Freq < #cpFreqTarget + 26 || (#qmReq == 2 && @Compressor_Freq < #cpFreqTarget + 32) then
 		#qmReq = 2;
 	else
-		#qmReq = 3;					-- Maximum compressor limitation
+		#qmReq = 3;												-- Maximum compressor limitation
 	end
 	-- Relax quiet mode by one level for daytime DHW when applicable.
 	$qmDHWOffset = 0;
 	if #qmReq > 0 && @ThreeWay_Valve_State && %hour > 9 && %hour < 17 then
-		$qmDHWOffset = -1;					-- Relax one level during daytime DHW
+		$qmDHWOffset = -1;											-- Relax one level during daytime DHW
 	end
 	-- The buffer-tank setting has priority over computed quiet mode.
 	if @Buffer_Tank_Delta < 4 then
@@ -509,7 +509,7 @@ on timer=8 then
 	if gpio(33) == 1 then
 		#otCHOffStartTime = -1;
 		if (#rtDelta < 0 && #chEnable == 0) || (#rtDelta > 0.2 && #chEnable == 1) then
-			#chEnable = 1 - #chEnable;					-- Toggle with room-temperature hysteresis
+			#chEnable = 1 - #chEnable;									-- Toggle with room-temperature hysteresis
 			#chEnableChangeTime = #Time;
 		end
 	else
@@ -525,7 +525,7 @@ on timer=8 then
 				#otCHOffStartTime = #Time;
 			end
 			$otCHOffElapsedMin = (#Time - #otCHOffStartTime + 10080) % 10080;
-			if $otCHOffElapsedMin > 15 && #chEnable == 1 then		-- Require >15 minutes continuously OFF
+			if $otCHOffElapsedMin > 15 && #chEnable == 1 then						-- Require >15 minutes continuously OFF
 				#chEnable = 0;
 				#chEnableChangeTime = #Time;
 			end
@@ -596,10 +596,10 @@ rule 13]]
 on timer=9 then
 	setTimer(9,300);
 	-- Independent controller parameters and correction limits (in C).
-	$piKp = 1.2;									-- Proportional gain
-	$piKi = 0.05;									-- Integral gain per five-minute sample
-	$piILimit = 5;									-- Maximum I contribution in C
-	$piLimit = 5;									-- Maximum total PI correction in C
+	$piKp = 1.2;												-- Proportional gain
+	$piKi = 0.05;												-- Integral gain per five-minute sample
+	$piILimit = 5;												-- Maximum I contribution in C
+	$piLimit = 5;												-- Maximum total PI correction in C
 	-- Evohome is temporarily OFF (12 C) during DHW: hold both I state and PI output.
 	-- Resume only after the valve is back, DHW has finished and the normal setpoint is restored.
 	if #hwState < 1 && @ThreeWay_Valve_State == 0 && ?roomTempSet > 12 && #rtSetpoint > 12 then
@@ -617,7 +617,7 @@ on timer=9 then
 		end
 		-- The I contribution is held during interruptions and setpoint changes.
 		$piOutput = $piP + #piIntegral;
-		#piCorrection = round(min(max($piOutput, $piLimit * -1), $piLimit));		-- Rounded correction for TaShift
+		#piCorrection = round(min(max($piOutput, $piLimit * -1), $piLimit));				-- Rounded correction for TaShift
 	end
 end
 
@@ -634,9 +634,9 @@ Called by:	Scheduled from timer=1 after 22 seconds; repeats every 1800 seconds.
 rule 14]]
 on timer=10 then
 	setTimer(10,1800);
-	$wcTargetLow = @Z1_Heat_Curve_Target_Low_Temp;			-- Target at $wcOutsideHigh
-	$wcTargetHigh = 36;						-- Target at $wcOutsideLow (Direct mode)
-	$wcOutsideHigh = @Z1_Heat_Curve_Outside_High_Temp;		-- Higher outside-temperature point
+	$wcTargetLow = @Z1_Heat_Curve_Target_Low_Temp;				-- Target at $wcOutsideHigh
+	$wcTargetHigh = 36;							-- Target at $wcOutsideLow (Direct mode)
+	$wcOutsideHigh = @Z1_Heat_Curve_Outside_High_Temp;			-- Higher outside-temperature point
 	$wcOutsideLow = @Z1_Heat_Curve_Outside_Low_Temp;			-- Lower outside-temperature point
 
 	-- Interpolate between the two curve points; round up and clamp the result.
