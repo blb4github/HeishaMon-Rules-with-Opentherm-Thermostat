@@ -2,6 +2,8 @@
 
 This guide records the agreed conventions introduced in **Rules 2611.10**. Its purpose is maintainability and readability, not a new heat-pump control strategy.
 
+For variable naming and the staged per-name approval process, see [Rules variable naming criteria](RULES-NAMING-CONVENTION.md). This convention is proposed separately from any Rules source-code changes.
+
 ## Authoritative source and workflow
 
 - **Edit only `HeishaMon_Rules_BlB4_commented.lua`.** It is the maintained, annotated source. The `.lua` extension does not mean standard Lua; this is the HeishaMon Rules language.
