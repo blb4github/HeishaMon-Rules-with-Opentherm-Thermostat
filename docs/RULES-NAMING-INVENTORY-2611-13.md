@@ -213,67 +213,67 @@ Geen van de onderstaande voorstellen is al geaccepteerd. De auteur beslist per n
 
 | Huidig → voorstel | Prefix | Wijzigingsindeling | Besluit | Definitieve naam |
 | --- | :---: | --- | --- | --- |
-| `#CompFreqTarget` → `#cpFreqTarget` | `cp` | Prefix + naam | Pending | — |
-| `#CompRunMin` → `#cpStateMin` | `cp` | Prefix + naam | Pending | — |
-| `#CompRunSec` → `#cpRunSec` | `cp` | Prefix + naam | Pending | — |
-| `#CompState` → `#cpState` | `cp` | Prefix + naam | Pending | — |
-| `#CompStateChangeTime` → `#cpStateChangeTime` | `cp` | Prefix + naam | Pending | — |
-| `$CompElapsed` → `$cpElapsedMin` | `cp` | Prefix + naam | Pending | — |
-| `#chEnableTimeOff` → `#otCHOffStartTime` | `ot` | Prefix + naam | Pending | — |
-| `$chEnableOffElapsed` → `$otCHOffElapsedMin` | `ot` | Prefix + naam | Pending | — |
-| `#chEnableOnMin` → `#chStateMin` | `ch` | Alleen naam | Pending | — |
-| `$chEnableCondition` → `$chRestartAllowed` | `ch` | Alleen naam | Pending | — |
-| `$chEnableElapsed` → `$chElapsedMin` | `ch` | Alleen naam | Pending | — |
-| `$OverNight` → `$chOverNight` | `ch` | Alleen prefix | Pending | — |
-| `#RoomSetpoint` → `#rtSetpoint` | `rt` | Prefix + naam | Pending | — |
-| `#RoomTemp` → `#rtTemp` | `rt` | Prefix + naam | Pending | — |
-| `#RoomTempDelta` → `#rtDelta` | `rt` | Prefix + naam | Pending | — |
-| `$RoomError` → `$piError` | `pi` | Prefix + naam | Pending | — |
-| `$Kp` → `$piKp` | `pi` | Alleen prefix | Pending | — |
-| `$Ki` → `$piKi` | `pi` | Alleen prefix | Pending | — |
-| `$PIp` → `$piP` | `pi` | Prefix + naam | Pending | — |
-| `#PIDintegral` → `#piIntegral` | `pi` | Prefix + naam | Pending | — |
-| `$PIintegralNext` → `$piIntegralNext` | `pi` | Prefix + naam | Pending | — |
-| `$PIcandidate` → `$piCandidate` | `pi` | Prefix + naam | Pending | — |
-| `$Ilimit` → `$piILimit` | `pi` | Prefix + naam | Pending | — |
-| `$PIlimit` → `$piLimit` | `pi` | Prefix + naam | Pending | — |
-| `$PIoutput` → `$piOutput` | `pi` | Prefix + naam | Pending | — |
-| `#RoomTempControl` → `#piCorrection` | `pi` | Prefix + naam | Pending | — |
-| `#TaPIStepTime` → `#piStepTime` | `pi` | Prefix + naam | Pending | — |
-| `#WCS` → `#wcBase` | `wc` | Prefix + naam | Pending | — |
-| `$WCS` → `$wcAdjusted` | `wc` | Prefix + naam | Pending | — |
-| `$Ta1` → `$wcTa1` | `wc` | Alleen prefix | Pending | — |
-| `$Ta2` → `$wcTa2` | `wc` | Alleen prefix | Pending | — |
-| `$Tb1` → `$wcTb1` | `wc` | Alleen prefix | Pending | — |
-| `$Tb2` → `$wcTb2` | `wc` | Alleen prefix | Pending | — |
-| `#SHifT` → `#taShift` | `ta` | Prefix + naam | Pending | — |
-| `#TaDelta` → `#taDelta` | `ta` | Prefix + naam | Pending | — |
-| `#TaDeltaTimer` → `#taDeltaSec` | `ta` | Prefix + naam | Pending | — |
-| `#NoDefrost` → `#taDefrostAllowed` | `ta` | Prefix + naam | Pending | — |
-| `#Z1HRT` → `#taZ1ReqTemp` | `ta` | Prefix + naam | Pending | — |
-| `#Heat` → `#hpHeatingMode` | `hp` | Prefix + naam | Pending | — |
-| `#HPStateR` → `#hpStateReq` | `hp` | Prefix + naam | Pending | — |
-| `#HPStateP` → `#hpStatePrev` | `hp` | Prefix + naam | Pending | — |
-| `#OMR` → `#hpModeReq` | `hp` | Prefix + naam | Pending | — |
-| `#OMP` → `#hpModePrev` | `hp` | Prefix + naam | Pending | — |
-| `#OutsideTemp` → `#hpOutsideTemp` | `hp` | Alleen prefix | Pending | — |
-| `#DHWRun` → `#hwState` | `hw` | Prefix + naam | Pending | — |
-| `#DHWTempP` → `#hwTempLast` | `hw` | Prefix + naam | Pending | — |
-| `#DHWComfortDay` → `#hwComfortDay` | `hw` | Prefix + naam | Pending | — |
-| `#DHWSterilizationDay` → `#hwSterilizationDay` | `hw` | Prefix + naam | Pending | — |
-| `$DHW10Condition` → `$hwDeepLow` | `hw` | Prefix + naam | Pending | — |
-| `$DHW9hCondition` → `$hwLowOrDrop` | `hw` | Prefix + naam | Pending | — |
-| `$DHWTime` → `$hwStartHour` | `hw` | Prefix + naam | Pending | — |
-| `$DHWTimeCondition` → `$hwScheduleEligible` | `hw` | Prefix + naam | Pending | — |
-| `#CoolingEnable` → `#clEnable` | `cl` | Prefix + naam | Pending | — |
-| `$CoolingEnable` → `$clEnable` | `cl` | Prefix + naam | Pending | — |
-| `$CoolForce` → `$clOffset` | `cl` | Prefix + naam | Pending | — |
-| `$CoolingControl` → `$clReqTemp` | `cl` | Prefix + naam | Pending | — |
-| `$CoolReqTempMin` → `$clReqTempMin` | `cl` | Prefix + naam | Pending | — |
-| `$MaxPumpDuty` → `$puMaxDuty` | `pu` | Prefix + naam | Pending | — |
-| `$MaxPumpFlow` → `$puFlowTarget` | `pu` | Prefix + naam | Pending | — |
-| `#QMR` → `#qmReq` | `qm` | Prefix + naam | Pending | — |
-| `$QMDHW` → `$qmDHWOffset` | `qm` | Prefix + naam | Pending | — |
+| `#CompFreqTarget` → `#cpFreqTarget` | `cp` | Prefix + naam | Rename | — |
+| `#CompRunMin` → `#cpStateMin` | `cp` | Prefix + naam | Change | #cpRunMin |
+| `#CompRunSec` → `#cpRunSec` | `cp` | Prefix + naam | Rename | — |
+| `#CompState` → `#cpState` | `cp` | Prefix + naam | Rename | — |
+| `#CompStateChangeTime` → `#cpStateChangeTime` | `cp` | Prefix + naam | Rename | — |
+| `$CompElapsed` → `$cpElapsedMin` | `cp` | Prefix + naam | Rename | — |
+| `#chEnableTimeOff` → `#otCHOffStartTime` | `ot` | Prefix + naam | Rename | — |
+| `$chEnableOffElapsed` → `$otCHOffElapsedMin` | `ot` | Prefix + naam | Rename | — |
+| `#chEnableOnMin` → `#chStateMin` | `ch` | Alleen naam | Rename | — |
+| `$chEnableCondition` → `$chRestartAllowed` | `ch` | Alleen naam | Rename | — |
+| `$chEnableElapsed` → `$chElapsedMin` | `ch` | Alleen naam | Rename | — |
+| `$OverNight` → `$chOverNight` | `ch` | Alleen prefix | Rename | — |
+| `#RoomSetpoint` → `#rtSetpoint` | `rt` | Prefix + naam | Rename | — |
+| `#RoomTemp` → `#rtTemp` | `rt` | Prefix + naam | Rename | — |
+| `#RoomTempDelta` → `#rtDelta` | `rt` | Prefix + naam | Rename | — |
+| `$RoomError` → `$piError` | `pi` | Prefix + naam | Rename | — |
+| `$Kp` → `$piKp` | `pi` | Alleen prefix | Rename | — |
+| `$Ki` → `$piKi` | `pi` | Alleen prefix | Rename | — |
+| `$PIp` → `$piP` | `pi` | Prefix + naam | Rename | — |
+| `#PIDintegral` → `#piIntegral` | `pi` | Prefix + naam | Rename | — |
+| `$PIintegralNext` → `$piIntegralNext` | `pi` | Prefix + naam | Rename | — |
+| `$PIcandidate` → `$piCandidate` | `pi` | Prefix + naam | Rename | — |
+| `$Ilimit` → `$piILimit` | `pi` | Prefix + naam | Rename | — |
+| `$PIlimit` → `$piLimit` | `pi` | Prefix + naam | Rename | — |
+| `$PIoutput` → `$piOutput` | `pi` | Prefix + naam | Rename | — |
+| `#RoomTempControl` → `#piCorrection` | `pi` | Prefix + naam | Rename | — |
+| `#TaPIStepTime` → `#piStepTime` | `pi` | Prefix + naam | Rename | — |
+| `#WCS` → `#wcBase` | `wc` | Prefix + naam | Change | #wcTarget |
+| `$WCS` → `$wcAdjusted` | `wc` | Prefix + naam | Rename | — |
+| `$Ta1` → `$wcTa1` | `wc` | Alleen prefix | Change | $wcTargetLow |
+| `$Ta2` → `$wcTa2` | `wc` | Alleen prefix | Change | $wcTargetHigh |
+| `$Tb1` → `$wcTb1` | `wc` | Alleen prefix | Change | $wcOutsideHigh |
+| `$Tb2` → `$wcTb2` | `wc` | Alleen prefix | Change | $wcOutsideLow |
+| `#SHifT` → `#taShift` | `ta` | Prefix + naam | Rename | — |
+| `#TaDelta` → `#taDelta` | `ta` | Prefix + naam | Rename | — |
+| `#TaDeltaTimer` → `#taDeltaSec` | `ta` | Prefix + naam | Rename | — |
+| `#NoDefrost` → `#taDefrostAllowed` | `ta` | Prefix + naam | Rename | — |
+| `#Z1HRT` → `#taZ1ReqTemp` | `ta` | Prefix + naam | Rename | — |
+| `#Heat` → `#hpHeatingMode` | `hp` | Prefix + naam | Rename | — |
+| `#HPStateR` → `#hpStateReq` | `hp` | Prefix + naam | Rename | — |
+| `#HPStateP` → `#hpStatePrev` | `hp` | Prefix + naam | Rename | — |
+| `#OMR` → `#hpModeReq` | `hp` | Prefix + naam | Rename | — |
+| `#OMP` → `#hpModePrev` | `hp` | Prefix + naam | Rename | — |
+| `#OutsideTemp` → `#hpOutsideTemp` | `hp` | Alleen prefix | Rename | — |
+| `#DHWRun` → `#hwState` | `hw` | Prefix + naam | Rename | — |
+| `#DHWTempP` → `#hwTempLast` | `hw` | Prefix + naam | Rename | — |
+| `#DHWComfortDay` → `#hwComfortDay` | `hw` | Prefix + naam | Rename | — |
+| `#DHWSterilizationDay` → `#hwSterilizationDay` | `hw` | Prefix + naam | Rename | — |
+| `$DHW10Condition` → `$hwDeepLow` | `hw` | Prefix + naam | Rename | — |
+| `$DHW9hCondition` → `$hwLowOrDrop` | `hw` | Prefix + naam | Rename | — |
+| `$DHWTime` → `$hwStartHour` | `hw` | Prefix + naam | Rename | — |
+| `$DHWTimeCondition` → `$hwScheduleEligible` | `hw` | Prefix + naam | Rename | — |
+| `#CoolingEnable` → `#clEnable` | `cl` | Prefix + naam | Rename | — |
+| `$CoolingEnable` → `$clEnable` | `cl` | Prefix + naam | Rename | — |
+| `$CoolForce` → `$clOffset` | `cl` | Prefix + naam | Rename | — |
+| `$CoolingControl` → `$clReqTemp` | `cl` | Prefix + naam | Rename | — |
+| `$CoolReqTempMin` → `$clReqTempMin` | `cl` | Prefix + naam | Rename | — |
+| `$MaxPumpDuty` → `$puMaxDuty` | `pu` | Prefix + naam | Rename | — |
+| `$MaxPumpFlow` → `$puFlowTarget` | `pu` | Prefix + naam | Rename | — |
+| `#QMR` → `#qmReq` | `qm` | Prefix + naam | Rename | — |
+| `$QMDHW` → `$qmDHWOffset` | `qm` | Prefix + naam | Rename | — |
 
 ## Implementatie blijft nadrukkelijk een aparte stap
 
