@@ -1,6 +1,6 @@
 # Variabelenoverzicht en prefixvoorstellen — Rules 2611.13
 
-**Status:** volledige concept-inventaris; **geen naamwijziging goedgekeurd of uitgevoerd**.
+**Status:** auteur heeft alle 61 voorgestelde wijzigingen beoordeeld: 55 × `Rename` (voorgestelde naam) en 6 × `Change` (zelf gekozen definitieve naam). De overige 3 namen blijven gelijk. De Rules-code is nog niet aangepast.
 **Gebaseerd op:** `HeishaMon_Rules_BlB4_commented.lua` (versie 2611.13, bron-blob `dea01246fa04134e845c8e8247ee43e34d9f0818`) en [ontwerpcriteria NC-01–NC-12](RULES-NAMING-CONVENTION.md).
 
 ## Naamvorm, begrenzing en wijzigingsindeling
@@ -209,7 +209,7 @@ Gevraagde Quiet Mode en correctie tijdens DHW.
 
 ## Beslisregister — per werkelijke wijziging
 
-Geen van de onderstaande voorstellen is al geaccepteerd. De auteur beslist per naam **Rename / Keep / Defer**; de tabel is geen opdracht om alle variabelen te hernoemen.
+**Alle keuzes zijn ingevuld door de auteur.** `Rename` betekent dat de voorgestelde naam de definitieve naam wordt; `Change` betekent dat de waarde in de kolom **Definitieve naam** in plaats van het voorstel wordt gebruikt. Er staan geen openstaande keuzes meer. De eerdere groepsvoorstellen blijven zichtbaar als vergelijkingsmateriaal.
 
 | Huidig → voorstel | Prefix | Wijzigingsindeling | Besluit | Definitieve naam |
 | --- | :---: | --- | --- | --- |
