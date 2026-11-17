@@ -18,14 +18,14 @@
 | Current name | Refs | Rule(s) | Meaning / value | Class | Proposed future name | Rationale |
 | --- | ---: | --- | --- | :---: | --- | --- |
 | `#chEnable` | 15 | T1, T4, T8, T9 | Gefilterde CH-vraag: Evohome of GPIO33-hysterese. | **B** | `#CHEnable` | NC-01/05: schrijf CH als protocolafkorting consequent; niet gelijk aan HP ON. |
-| `#chEnableChangeTime` | 6 | Boot, T1, T8 | Weekminuut van laatste interne CH-vraagwisseling. | **B** | `#CHEnableChangeWeekMin` | NC-01/06: CH-hoofdletters en tijdreferentie expliciet. |
+| `#chEnableChangeTime` | 6 | Boot, T1, T8 | Weekdaggebaseerd minuutgetal bij laatste interne CH-vraagwisseling. | **B** | `#CHEnableChangeWeekMin` | NC-01/06: CH-hoofdletters en tijdreferentie expliciet. |
 | `#chEnableOnMin` | 5 | Boot, T4, T8 | Getekende duur van huidige CH-vraagstatus (+aan, −uit). | **B** | `#CHEnableSignedMin` | NC-01/06: huidige naam suggereert alleen AAN; duur is getekend. |
-| `#chEnableTimeOff` | 6 | Boot, T8 | Beginweekminuut van ononderbroken onbewerkte OT-offperiode; −1 = geen. | **B** | `#CHEnableOffStartWeekMin` | NC-01/06: expliciet starttijdstip, geen verstreken tijd. |
+| `#chEnableTimeOff` | 6 | Boot, T8 | Weekdaggebaseerd startminuutgetal van ononderbroken ruwe OT-offperiode; −1 = geen. | **B** | `#CHEnableOffStartWeekMin` | NC-01/06: expliciet starttijdstip, geen verstreken tijd. |
 | `#CompFreqTarget` | 10 | Boot, T7, TaShift2 | Berekende compressorfrequentiereferentie (Hz) voor quiet-mode en PI-stap. | **A** | `#CompFreqTarget` | NC-03/09: compacte, bruikbare technische naam. |
 | `#CompRunMin` | 11 | Boot, T2, Freq, TaShift, T4, T7, TaShift2 | Getekende compressorstatusduur in minuten (+draait, −staat stil). | **C** | `#CompRunMin` | NC-06/09: ingeburgerd; vermeld dat negatieve waarden OFF-duur betekenen. |
 | `#CompRunSec` | 11 | Boot, T1, Freq, T3, TaShift, T11, TaShift2 | Opstartteller in seconden; 1999 markeert reeds lopende compressor. | **C** | `#CompRunSec` | NC-06/09: naam handhaven; teller stopt na drempel en kent sentinel. |
 | `#CompState` | 15 | T1, Freq, TaShift, T4, T5, T7, T8, TaShift2 | Compressorstatus 0=uit, 1=nieuw gestart, 2=al actief bij reload. | **C** | `#CompState` | NC-08/09: goede naam; leg de enumcodes vast. |
-| `#CompStateChangeTime` | 4 | T1, T2, Freq | Weekminuut van laatste compressorstatusverandering. | **B** | `#CompStateChangeWeekMin` | NC-06: eenheid en weekreferentie expliciet. |
+| `#CompStateChangeTime` | 4 | T1, T2, Freq | Weekdaggebaseerd minuutgetal bij laatste compressorstatusverandering. | **B** | `#CompStateChangeWeekMin` | NC-06: eenheid en weekreferentie expliciet. |
 | `#CoolingEnable` | 5 | Boot, T4, T8 | Laagdoorlaat-gefilterde OT-koelvraag. | **C** | `#CoolingEnable` | NC-09: naam is compact; documenteer verschil met ruwe OT-input. |
 | `#DHWComfortDay` | 2 | Boot, T5 | Weekdag voor extra comfort-DHW-controle. | **A** | `#DHWComfortDay` | NC-03: helder en domeineigen. |
 | `#DHWRun` | 14 | Boot, T1, TaShift, T4, T5, T8, T9 | DHW-toestand: −1 init, 0 idle, 1 finishing, 2 Rules-run, 3 extern gedetecteerd. | **C** | `#DHWRun` | NC-08/09: hoewel 'Run' geen boolean is, huidige naam handhaven met enum-uitleg. |
@@ -47,8 +47,8 @@
 | `#SHifT` | 12 | TaShift | Begrensde ±5 °C verschuiving van doeltemperatuur. | **B** | `#TargetShift` | NC-01/02: afwijkend hoofdletterpatroon en onduidelijke afkorting. |
 | `#TaDelta` | 6 | TaShift, T5, T12, TaShift2 | Aanvoertemperatuur minus actuele Z1-warmtevraagtemperatuur. | **C** | `#TaDelta` | NC-04/09: Ta is ingeburgerde domeinterm; leg tekenrichting vast. |
 | `#TaDeltaTimer` | 11 | Freq, T3, TaShift, T5, T12, TaShift2 | Bij overshoot getelde tijd in seconden. | **B** | `#TaDeltaSec` | NC-06: dit is een verstreken tijdsduur, geen timer-ID. |
-| `#TaPIStepTime` | 16 | Boot, T1, Freq, TaShift, T5, TaShift2 | Weekminuut van laatste PI-stap, −1 = handover niet actief. | **C** | `#TaPIStepTime` | NC-03/06/09: lange naam komt vaak voor; eenheid in documentatie kan voldoende zijn. |
-| `#Time` | 20 | T1, T2, Freq, Outlet, T8, TaShift2 | Huidige minuutpositie in week, modulo 10080. | **B** | `#WeekMin` | NC-06: maak temporele referentie expliciet; ondanks veelvuldig gebruik blijft kort. |
+| `#TaPIStepTime` | 16 | Boot, T1, Freq, TaShift, T5, TaShift2 | Weekdaggebaseerd minuutgetal van laatste PI-stap; −1 = handover niet actief. | **C** | `#TaPIStepTime` | NC-03/06/09: lange naam komt vaak voor; eenheid in documentatie kan voldoende zijn. |
+| `#Time` | 20 | T1, T2, Freq, Outlet, T8, TaShift2 | Minuutgetal %day×1440 + %hour×60 + %minute; verschillen worden modulo 10080 bepaald. | **B** | `#WeekMin` | NC-06: maak temporele referentie expliciet; ondanks veelvuldig gebruik blijft kort. |
 | `#WCS` | 5 | T1, TaShift, T8, T10 | Weersafhankelijk gecompenseerde basiswaarde (°C). | **C** | `#WCS` | NC-04/09: vertrouwde domeinafkorting; onderscheiden van lokale WCS. |
 | `#Z1HRT` | 15 | TaShift, TaShift2 | Berekende, uiteindelijk aangevraagde Z1-aanvoertemperatuur. | **B** | `#Z1HeatReqTemp` | NC-02/04: HRT is cryptisch; ReqTemp specificeert de grootheid. |
 
@@ -90,7 +90,7 @@
 ## Review topics before choosing replacements
 
 1. **CH terminology.** The `#chEnable*` family is based on the OT `?chEnable` signal but has extra GPIO33 filtering. The recommendation uses `CHEnable` for the family; alternatively the author may prefer `CHDemand`. Decide the **entire family** consistently without renaming the OT interface symbol.
-2. **Time references.** `#Time`, compressor-change and CH-change timestamps use minute positions inside a week (0..10079). The `WeekMin` suffix clarifies this. In contrast, signed `#CompRunMin` and `#chEnableOnMin` durations indicate **positive ON / negative OFF**, and `#TaPIStepTime = -1` signifies inactive. Long names in dense PI expressions may remain unchanged by author decision.
+2. **Time references.** `#Time`, compressor-change and CH-change timestamps use a week-day-based minute count (`%day * 1440 + %hour * 60 + %minute`), with **elapsed differences** normalized modulo 10080; the stored raw `#Time` is not itself modulo 10080. The `WeekMin` suffix clarifies this. In contrast, signed `#CompRunMin` and `#chEnableOnMin` durations indicate **positive ON / negative OFF**, and `#TaPIStepTime = -1` signifies inactive. Long names in dense PI expressions may remain unchanged by author decision.
 3. **Short historical names.** `#OMR`, `#OMP`, `#QMR`, `#HPStateP/R` are compact but opaque. The proposed `Req`/`Saved` replacements distinguish requested and saved values without fully spelling out the product names.
 4. **PI terms.** Prefer `PI` for a controller without a derivative term, preserve the conventional `Kp`/`Ki` symbols, and use consistent capitalization for other `PI*` locals.
 5. **WCS.** `#WCS` is the weather-compensated base; `$WCS` is the locally adjusted reference passed to `TaShift2`. The proposed longer `$AdjustedWCS` is a **trade-off**, because the local occurs frequently in mathematical expressions.
