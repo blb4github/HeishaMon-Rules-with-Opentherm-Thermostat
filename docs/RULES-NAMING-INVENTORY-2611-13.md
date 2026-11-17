@@ -3,6 +3,8 @@
 **Status:** Review proposal only. **No identifier renames approved or implemented.**
 **Baseline:** `main` rules source blob `dea01246fa04134e845c8e8247ee43e34d9f0818` (2611.13); criteria [RULES-NAMING-CONVENTION.md](RULES-NAMING-CONVENTION.md).
 
+**Review status:** the 64-variable source inventory and occurrence counts remain useful, but its suggested names, classifications and 40 B candidates are **provisional** and predate the refined design criteria. A functional-group reassessment is required before any per-name decision. In particular, preserve `#Time` as a valid core reference, use `Last` for last earlier samples and `Prev` for restorable previous states, and do not enforce `Duration` or `WeekMin` suffixes.
+
 ## Review method
 
 - Enumerated `#` and `$` identifiers from **executable source only** (block comments, line comments and diagnostic strings excluded); `System#Boot` event syntax excluded.
