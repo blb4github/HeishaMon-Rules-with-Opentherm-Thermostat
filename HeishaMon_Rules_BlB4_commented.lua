@@ -1,5 +1,5 @@
 -- This is the maintained source file; generate a loadable version with the minify tool. https://github.com/klaashoekstra94/heishamon_rules_minify
--- Version: 2611.14 (commented only; naming refactor of 2611.13)
+-- Version: 2611.16 (target stability: compressor-off hysteresis and guarded PI target reductions)
 -- Requires the HeishaMon Rules build supporting more than 127 variables and GPIO33.
 
 --[[
@@ -24,7 +24,7 @@ Result:		Selected # state variables; starts timer=1.
 Called by:	System boot; timer=1 is first scheduled after 10 seconds.
 rule 01]]
 on System#Boot then
-	print('BLB Heishamon_rules_2611.15.lua');
+	print('BLB Heishamon_rules_2611.16.lua');
 	-- Initialize state without reading unavailable boot-time inputs.
 	#chStateMin = -1;					-- Signed minutes: on > 0, off < 0
 	#chEnableChangeTime = -1;
@@ -236,7 +236,8 @@ on TaShift then
 		-- When the compressor is off, force low target or neutral target by conditions.
 		elseif (%hour < 7 || %hour > 22 || #rtDelta > 0.2) then
 			#taShift = -5;
-		elseif #cpRunMin > (-2 * #hpOutsideTemp - 30) && (#rtDelta > 0.1 || (#rtDelta > 0 && #taShift == -5)) then
+		-- Keep the reduced request across small negative room deviations; existing off-time gate still applies.
+		elseif #cpRunMin > (-2 * #hpOutsideTemp - 30) && (#rtDelta > 0.1 || (#rtDelta > -0.15 && #taShift == -5)) then
 			#taShift = -5;
 		else
 			#taShift = 0;
@@ -703,8 +704,12 @@ on TaShift2($wcAdjusted) then
 				@Compressor_Freq <= #cpFreqTarget)))) then
 			if $wcAdjusted + #piCorrection > @Z1_Heat_Request_Temp then
 				#taZ1ReqTemp = min(@Z1_Heat_Request_Temp + 1, $wcAdjusted + #piCorrection);
-			elseif $wcAdjusted + #piCorrection < @Z1_Heat_Request_Temp && @Main_Outlet_Temp <= @Z1_Heat_Request_Temp + 0.8 then
+			elseif $wcAdjusted + #piCorrection < @Z1_Heat_Request_Temp then
 				#taZ1ReqTemp = max(@Z1_Heat_Request_Temp - 1, $wcAdjusted + #piCorrection);
+				-- Check the proposed lower target, not the current target, before allowing a down-step.
+				if @Main_Outlet_Temp > #taZ1ReqTemp + 0.8 then
+					#taZ1ReqTemp = @Z1_Heat_Request_Temp;
+				end
 			else
 				#taZ1ReqTemp = @Z1_Heat_Request_Temp;
 			end
