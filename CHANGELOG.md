@@ -1,5 +1,21 @@
 # Changelog
 
+## 2611.15 — 2026-11-18 (variable naming and equivalent PI cleanup)
+
+**Current published ruleset.** The author supplied both the annotated and firmware-loadable 2611.15 files; on-device execution of this precise version has not yet been separately confirmed.
+
+- Carry forward the **61 approved identifier renames** from PR #14 (55 original naming proposals and six author-selected alternatives). The three existing names `#Time`, `#chEnable` and `#chEnableChangeTime` remain unchanged. See [the decision register](docs/RULES-NAMING-INVENTORY-2611-13.md) and [naming convention](docs/RULES-NAMING-CONVENTION.md).
+- Restructure `timer=9` for readability with `$piError = #rtSetpoint - #rtTemp` rather than negating `#rtDelta`. The latter still means actual room temperature minus setpoint and remains unchanged for other control functions.
+- Make separate I-term bounds (`$piIMin = -5`, `$piIMax = 5`) and overall correction bounds (`$piMin = -5`, `$piMax = 5`) explicit. Retain `Kp = 1.2`, `Ki = 0.05` per five-minute cycle, the ±5 °C limits, conditional anti-windup, DHW/temporary-OFF hold, and the final whole-degree output rounding.
+- **No intentional control-behavior change compared with 2611.13.** Outside `timer=9`, the executable expressions match 2611.13 after the 61-name mapping and version-label normalization. The PI rewrite is equivalent when `#rtDelta = #rtTemp - #rtSetpoint` as maintained by timer 8. No changes to Rule ordering, timer intervals, heat-pump commands or other thresholds.
+- Verified the author's **annotated and loadable files have matching executable token streams**. A 250,000-case numerical comparison of old and new PI algebra found no differences; this is not a substitute for on-device release testing.
+- Update README and documentation status to reflect the now-published named Rules.
+
+## 2611.14 — 2026-11-18 (intermediate commented-source naming release)
+
+- Apply the decisions from PR #14 to the canonical commented source only; the repository's loadable file remained on 2611.13 at that stage.
+- The author confirmed 2611.14 running on HeishaMon with an independently supplied loadable file. The code refactoring changed names and associated documentation, not controller behavior.
+- Superseded by the paired annotated/loadable 2611.15 release.
 ## 2611.13 — 2026-11-16 (two-part TaShift, PI handover and DHW safeguards)
 
 **Current working ruleset.** The author confirmed that 2611.13 loads and runs on HeishaMon; extended operational validation is not implied.
