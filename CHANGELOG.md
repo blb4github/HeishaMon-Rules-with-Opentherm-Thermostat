@@ -1,8 +1,18 @@
 # Changelog
 
+## 2611.16 — 2026-11-18 (target stability refinements; field validation pending)
+
+**Field-test candidate loaded on HeishaMon.** The author reports that 2611.16 is installed. Outcome of the two stability fixes will be evaluated against the 2026-11-18 HeishaMon log and target/room-temperature graphs.
+
+- **A — PI down-step / overshoot interaction (`TaShift2`):** previously the down-step permission checked `@Main_Outlet_Temp <= @Z1_Heat_Request_Temp + 0.8`, relative to the **old/current** target. Now the next target is calculated first, and a proposed reduction is cancelled if `@Main_Outlet_Temp > #taZ1ReqTemp + 0.8`. Intended to stop short 1 °C PI reductions that are immediately undone by outlet overshoot protection during long compressor runs.
+- **B — compressor-off target hysteresis (`TaShift`):** change the hold condition from `#rtDelta > 0 && #taShift == -5` to `#rtDelta > -0.15 && #taShift == -5`. This retains the existing 5 °C reduced request through approximately `-0.1 °C` room deviation and seeks to prevent brief 5 °C target spikes and associated short compressor starts near the setpoint.
+- Both changes preserve the existing maximum 1 °C PI step, timing logic, independently active overshoot protection and compressor-off time gate. **They deliberately change target behavior** relative to 2611.15, unlike the 2611.14–2611.15 naming/PI readability refactor.
+- Both author-supplied 2611.16 files were verified to have identical executable token streams; outside the two named branches and the boot version message, the executable logic is identical to 2611.15.
+- Correct the annotated source's stale `2611.14` version header and document the rationale and field-test checklist in [technical notes](docs/TARGET-STABILITY-2611-16.md).
+- **Validation still required:** watch for persistent elevated targets after correction A, remaining off-cycle target pulses/short starts after correction B, and normal recovery of heating demand. Loading 2611.16 does not yet prove improvement.
 ## 2611.15 — 2026-11-18 (variable naming and equivalent PI cleanup)
 
-**Current published ruleset.** The author supplied both the annotated and firmware-loadable 2611.15 files; on-device execution of this precise version has not yet been separately confirmed.
+**Previous release.** The author supplied both the annotated and firmware-loadable 2611.15 files; on-device execution of this precise version has not yet been separately confirmed.
 
 - Carry forward the **61 approved identifier renames** from PR #14 (55 original naming proposals and six author-selected alternatives). The three existing names `#Time`, `#chEnable` and `#chEnableChangeTime` remain unchanged. See [the decision register](docs/RULES-NAMING-INVENTORY-2611-13.md) and [naming convention](docs/RULES-NAMING-CONVENTION.md).
 - Restructure `timer=9` for readability with `$piError = #rtSetpoint - #rtTemp` rather than negating `#rtDelta`. The latter still means actual room temperature minus setpoint and remains unchanged for other control functions.
