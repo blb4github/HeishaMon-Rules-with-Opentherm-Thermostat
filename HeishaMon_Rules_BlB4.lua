@@ -1,5 +1,5 @@
 on System#Boot then
-	print('BLB Heishamon_rules_2611.15.lua');
+	print('BLB Heishamon_rules_2611.16.lua');
 	#chStateMin = -1;
 	#chEnableChangeTime = -1;
 	#otCHOffStartTime = -1;
@@ -132,7 +132,7 @@ on TaShift then
 			end
 		elseif (%hour < 7 || %hour > 22 || #rtDelta > 0.2) then
 			#taShift = -5;
-		elseif #cpRunMin > (-2 * #hpOutsideTemp - 30) && (#rtDelta > 0.1 || (#rtDelta > 0 && #taShift == -5)) then
+		elseif #cpRunMin > (-2 * #hpOutsideTemp - 30) && (#rtDelta > 0.1 || (#rtDelta > -0.15 && #taShift == -5)) then
 			#taShift = -5;
 		else
 			#taShift = 0;
@@ -432,8 +432,11 @@ on TaShift2($wcAdjusted) then
 		if (#hpOutsideTemp <= 7 || #cpRunSec >= 130 || #cpRunSec == -1) && ((#piStepTime < 0 && (#cpRunMin >= 15 || (#cpRunMin >= 2 && @Compressor_Freq <= #cpFreqTarget))) || (#piStepTime >= 0 && ((#Time - #piStepTime + 10080) % 10080 >= 15 || ((#Time - #piStepTime + 10080) % 10080 >= 10 && @Compressor_Freq <= #cpFreqTarget)))) then
 			if $wcAdjusted + #piCorrection > @Z1_Heat_Request_Temp then
 				#taZ1ReqTemp = min(@Z1_Heat_Request_Temp + 1, $wcAdjusted + #piCorrection);
-			elseif $wcAdjusted + #piCorrection < @Z1_Heat_Request_Temp && @Main_Outlet_Temp <= @Z1_Heat_Request_Temp + 0.8 then
+			elseif $wcAdjusted + #piCorrection < @Z1_Heat_Request_Temp then
 				#taZ1ReqTemp = max(@Z1_Heat_Request_Temp - 1, $wcAdjusted + #piCorrection);
+				if @Main_Outlet_Temp > #taZ1ReqTemp + 0.8 then
+					#taZ1ReqTemp = @Z1_Heat_Request_Temp;
+				end
 			else
 				#taZ1ReqTemp = @Z1_Heat_Request_Temp;
 			end
