@@ -1,8 +1,28 @@
 # Changelog
 
+## 2611.19 — 2026-11-21 (combined 2611.17–2611.19 changes since 2611.16)
+
+**Status:** The author reports 2611.19 running on HeishaMon. This entry consolidates the three locally tested iterations, without separate 2611.17/2611.18 changelog entries.
+
+- **2611.17 — stagger pump and target writes:** `timer=6` starts **47 seconds** after successful initialization rather than 40, while retaining its 60-second recurring interval. The intent is to reduce near-simultaneous `SetMaxPumpDuty` and `SetZ1HeatRequestTemperature` commands, which coincided with some requested temperature changes not being reflected in the Panasonic's readback. That correlation does **not** establish a firmware communication defect or prove the timing change resolves it.
+- **2611.17 — suppress unnecessary pump-limit commands:** introduce local `$puLimitCheck` in `timer=6`. For normal compressor-driven space heating with no defrost and `@Pump_Flow >= 8`, write `@SetMaxPumpDuty` only if the calculated limit differs **and** `@Pump_Duty >= min(@Max_Pump_Duty, $puMaxDuty)`. Thus, when the actual duty is below both old and desired limits, changing the maximum provides no immediate hydraulic effect and no command is sent. The existing target calculation, minimum limit of 82, DHW, defrost, cooling, compressor-idle and low-flow overrides remain as before.
+- **2611.18 — 10-minute sustained room overshoot:** add global `#rtHighStartTime = -1`. In `timer=8`, save `#Time` at the first `#rtDelta > 0.2` reading and reset to -1 on recovery. In `timer=4`, replace the direct daytime +0.2 °C OFF trigger by `#rtHighStartTime >= 0 && (#Time - #rtHighStartTime + 10080) % 10080 >= 10 && %hour > 9`. Weekly wrap-around is retained; no tick counter or new scheduled timer is introduced. Existing independent `#rtDelta > 1.5` and `#chEnable == 0` for over 30 minutes, compressor run/off, outside temperature and restart conditions are unchanged.
+- **2611.19 — one shared upper room-temperature threshold:** add `#rtUpperThreshold = 0.21` in `System#Boot` and replace the **five** former `0.2` literals in (1) `timer=8` overtemperature timing, (2) `timer=4` restart permission, (3) compressor-off `TaShift`, (4) GPIO33/Dim demand hysteresis in `timer=8`, and (5) `timer=9` PI-integrator eligibility. The distinct strict/non-strict operators are unchanged. With the previous threshold of 0.2, observed `#rtDelta = +0.203125` could just trigger the OFF dwell; 0.21 deliberately places that reading below the common boundary.
+- **Scope and verification:** the author supplied the annotated and loadable 2611.19 files. Their executable token streams match, with 17 Rule handlers. The annotated source's stale `2611.14` header is corrected and documentation is brought up to date; no extra executable changes were introduced while publishing. Overnight/long-run behavior and reliable acknowledgment of heating-target writes still warrant monitoring.
+
+## 2611.16 — 2026-11-18 (target stability refinements; field validation pending)
+
+**Field-test candidate loaded on HeishaMon.** The author reports that 2611.16 is installed. Outcome of the two stability fixes will be evaluated against the 2026-11-18 HeishaMon log and target/room-temperature graphs.
+
+- **A — PI down-step / overshoot interaction (`TaShift2`):** previously the down-step permission checked `@Main_Outlet_Temp <= @Z1_Heat_Request_Temp + 0.8`, relative to the **old/current** target. Now the next target is calculated first, and a proposed reduction is cancelled if `@Main_Outlet_Temp > #taZ1ReqTemp + 0.8`. Intended to stop short 1 °C PI reductions that are immediately undone by outlet overshoot protection during long compressor runs.
+- **B — compressor-off target hysteresis (`TaShift`):** change the hold condition from `#rtDelta > 0 && #taShift == -5` to `#rtDelta > -0.15 && #taShift == -5`. This retains the existing 5 °C reduced request through approximately `-0.1 °C` room deviation and seeks to prevent brief 5 °C target spikes and associated short compressor starts near the setpoint.
+- Both changes preserve the existing maximum 1 °C PI step, timing logic, independently active overshoot protection and compressor-off time gate. **They deliberately change target behavior** relative to 2611.15, unlike the 2611.14–2611.15 naming/PI readability refactor.
+- Both author-supplied 2611.16 files were verified to have identical executable token streams; outside the two named branches and the boot version message, the executable logic is identical to 2611.15.
+- Correct the annotated source's stale `2611.14` version header and document the rationale and field-test checklist in [technical notes](docs/TARGET-STABILITY-2611-16.md).
+- **Validation still required:** watch for persistent elevated targets after correction A, remaining off-cycle target pulses/short starts after correction B, and normal recovery of heating demand. Loading 2611.16 does not yet prove improvement.
 ## 2611.15 — 2026-11-18 (variable naming and equivalent PI cleanup)
 
-**Current published ruleset.** The author supplied both the annotated and firmware-loadable 2611.15 files; on-device execution of this precise version has not yet been separately confirmed.
+**Previous release.** The author supplied both the annotated and firmware-loadable 2611.15 files; on-device execution of this precise version has not yet been separately confirmed.
 
 - Carry forward the **61 approved identifier renames** from PR #14 (55 original naming proposals and six author-selected alternatives). The three existing names `#Time`, `#chEnable` and `#chEnableChangeTime` remain unchanged. See [the decision register](docs/RULES-NAMING-INVENTORY-2611-13.md) and [naming convention](docs/RULES-NAMING-CONVENTION.md).
 - Restructure `timer=9` for readability with `$piError = #rtSetpoint - #rtTemp` rather than negating `#rtDelta`. The latter still means actual room temperature minus setpoint and remains unchanged for other control functions.
