@@ -2,7 +2,7 @@
 
 These are the rules I use to control a Panasonic heat pump with an OpenTherm thermostat. They are tailored to my installation; use them as inspiration and adapt the settings and integration to your own system.
 
-## Current version: 2611.16 (2026-11-18)
+## Current version: 2611.19 (2026-11-21)
 
 See [CHANGELOG.md](CHANGELOG.md) for the changes in each published version.
 
@@ -69,7 +69,7 @@ The guard is deliberately limited to those eight values; it is not a blanket rea
 
 ### TaShift refactor and DHW-safe PI control (2611.11–2611.13)
 
-**2611.13 established the controller structure retained through 2611.16.** Version 2611.16 makes two targeted stability changes to the target calculation (see below); it is not a behavior-preserving rename-only release. It retains the established compressor-start, defrost, outlet-temperature and Zone 2 safety behavior while reorganizing TaShift to respect the Rules engine's **255-instruction conditional-jump limit**:
+**2611.13 established the controller structure retained through 2611.19.** Version 2611.16 makes two targeted stability changes to the target calculation (see below); it is not a behavior-preserving rename-only release. It retains the established compressor-start, defrost, outlet-temperature and Zone 2 safety behavior while reorganizing TaShift to respect the Rules engine's **255-instruction conditional-jump limit**:
 
 - `TaShift()` checks the existing heating/DHW/defrost gate, computes the effective `$WCS` once when the compressor is running, calculates the preliminary Zone 1 target, then calls `TaShift2($WCS)`.
 - `TaShift2($WCS)` handles the controlled PI handover, outlet-temperature corrections, direct Zone 2 override and final Zone 1 write. There are **17 Rules** in total (up from 16 in 2611.10). The two subrules were reported as 193 and 173 compiled instructions respectively; the conditional-jump check is a **per-jump** limit, not a maximum total ruleset size.
@@ -94,12 +94,22 @@ The supplied annotated and loadable 2611.15 files have **identical executable to
 
 ### Target stability refinements (2611.16)
 
-Version **2611.16** is a **field-test candidate** loaded on the author's HeishaMon on 2026-11-18. The author has not yet reported the next-day outcome. The purpose is to address two types of target oscillation observed on 2611.15:
+Version **2611.16** was loaded on the author's HeishaMon on 2026-11-18. Subsequent field observations motivated the changes in 2611.17–2611.19. The purpose is to address two types of target oscillation observed on 2611.15:
 
 - **A — Prevent premature 1 °C target reductions during long compressor runs:** `TaShift2` now checks the measured outlet temperature against the **proposed lower target + 0.8 °C**, instead of the **current target + 0.8 °C**. This should avoid PI immediately undoing a target increase applied by overshoot protection. The maximum 1 °C PI step, existing 10/15-minute timing and overshoot safety rules are unchanged. **Monitor whether a previously elevated target can still decrease in reasonable time**, since this condition can hold it higher for longer.
 - **B — Add modest hysteresis when the compressor is stopped:** `TaShift` retains a previously active `#taShift = -5` while `#rtDelta > -0.15 °C`, instead of only while `#rtDelta > 0 °C`. This should suppress short 5 °C target increases caused by temperature rounding near the room setpoint. The existing compressor-off time/outside-temperature condition still governs whether the low shift is held.
 
-The loadable and commented 2611.16 files have matching executable code. Other Rules and the PI formulation in `timer=9` are unchanged compared with 2611.15. On-device loading has been confirmed, but **behavioral improvement is not yet verified**. See [the complete observation, rationale and follow-up test plan](docs/TARGET-STABILITY-2611-16.md) and [CHANGELOG.md](CHANGELOG.md).
+The loadable and commented 2611.16 files have matching executable code. Other Rules and the PI formulation in `timer=9` are unchanged compared with 2611.15. On-device loading was confirmed; long-term field validation remains ongoing. See [the complete observation, rationale and follow-up test plan](docs/TARGET-STABILITY-2611-16.md) and [CHANGELOG.md](CHANGELOG.md).
+
+### Pump command reduction and room-temperature stop filtering (2611.17–2611.19)
+
+**2611.17** staggers the first `timer=6` pump update from 40 to **47 seconds** after startup initialization (its 60-second recurrence is unchanged). During normal space heating, with defrost inactive and `@Pump_Flow >= 8`, `$puLimitCheck` suppresses a `SetMaxPumpDuty` command unless the **actual** `@Pump_Duty` reaches the lower of the current and computed maximum duty. This avoids cycling a limit that the Panasonic is not using. The original DHW, defrost, cooling, compressor-idle and low-flow behavior is preserved. This reduces unnecessary pump commands; it is not proof that earlier closely spaced commands caused unacknowledged temperature requests.
+
+**2611.18** adds `#rtHighStartTime` and requires the room delta to remain above the upper threshold for **10 minutes** before the ordinary overtemperature OFF branch in `timer=4` can run (only from 10:00 onward and still subject to its existing compressor, outside-temperature and restart guards). `timer=8` records the start minute and resets it whenever the delta returns to or below the threshold. Existing independent triggers at `#rtDelta > 1.5` and sustained `#chEnable == 0` are unchanged.
+
+**2611.19** centralizes the five common room-temperature upper-bound comparisons into `#rtUpperThreshold = 0.21 °C` (previously individual literal `0.2` comparisons): the overshoot timer, restart permission, compressor-off TaShift, GPIO33/Dim demand hysteresis and PI-integrator eligibility. The distinct comparison operators (`<`, `<=`, `>`) remain unchanged. The chosen value is slightly above the observed quantized `+0.203125 °C` reading.
+
+The author reports **2611.19 running on HeishaMon**. Its longer-term compressor cycling, room comfort, DHW/defrost and target-write acknowledgement still require field observation; see the single combined [changelog entry](CHANGELOG.md).
 
 ## OpenTherm room values
 
