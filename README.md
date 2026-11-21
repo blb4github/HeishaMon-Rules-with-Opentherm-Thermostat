@@ -2,7 +2,7 @@
 
 These are the rules I use to control a Panasonic heat pump with an OpenTherm thermostat. They are tailored to my installation; use them as inspiration and adapt the settings and integration to your own system.
 
-## Current version: 2611.13 (2026-11-16)
+## Current version: 2611.15 (2026-11-18)
 
 See [CHANGELOG.md](CHANGELOG.md) for the changes in each published version.
 
@@ -69,7 +69,7 @@ The guard is deliberately limited to those eight values; it is not a blanket rea
 
 ### TaShift refactor and DHW-safe PI control (2611.11–2611.13)
 
-**2611.13 is the current working version.** It retains the established compressor-start, defrost, outlet-temperature and Zone 2 safety behavior while reorganizing TaShift to respect the Rules engine's **255-instruction conditional-jump limit**:
+**2611.13 established the controller logic retained in the current 2611.15 release.** It retains the established compressor-start, defrost, outlet-temperature and Zone 2 safety behavior while reorganizing TaShift to respect the Rules engine's **255-instruction conditional-jump limit**:
 
 - `TaShift()` checks the existing heating/DHW/defrost gate, computes the effective `$WCS` once when the compressor is running, calculates the preliminary Zone 1 target, then calls `TaShift2($WCS)`.
 - `TaShift2($WCS)` handles the controlled PI handover, outlet-temperature corrections, direct Zone 2 override and final Zone 1 write. There are **17 Rules** in total (up from 16 in 2611.10). The two subrules were reported as 193 and 173 compiled instructions respectively; the conditional-jump check is a **per-jump** limit, not a maximum total ruleset size.
@@ -77,9 +77,21 @@ The guard is deliberately limited to those eight values; it is not a blanket rea
 - `timer=9` **holds both the integral and PI output** during DHW and while Evohome temporarily presents its 12 °C OFF setpoint. Integration resumes only when DHW is finished, the three-way valve is back in heating position and the normal setpoint has returned.
 - After a Rules-managed DHW cycle finishes, `timer=5` resets `#TaPIStepTime`, `#TaDeltaTimer` and `#TaDelta` to restart the PI handover and outlet overshoot tracking cleanly.
 
-**Development history:** 2611.11 had an oversized conditional jump (about 360 instructions) and was rejected by a firmware build checking the 255-instruction limit. Version 2611.12 used an intermediate 24-Rule split; 2611.13 replaces that with the simpler two-part structure. Neither candidate supersedes the working 2611.13 ruleset.
+**Development history:** 2611.11 had an oversized conditional jump (about 360 instructions) and was rejected by a firmware build checking the 255-instruction limit. Version 2611.12 used an intermediate 24-Rule split; 2611.13 replaces that with the simpler two-part structure. Neither candidate superseded the then-working 2611.13 ruleset.
 
-The author confirmed that **2611.13 is running on HeishaMon**. This is an on-device load/running confirmation, not a completed long-term heating, cooling and DHW validation. See [technical release notes](docs/TA-SHIFT-2611-13.md) and [CHANGELOG.md](CHANGELOG.md).
+The author confirmed **2611.13 and subsequently 2611.14 running on HeishaMon**; those are load/running observations, not long-term heating, cooling and DHW validation. The supplied 2611.15 files have been compared for identical executable content, but no separate 2611.15 on-device test has been reported yet. See [technical release notes](docs/TA-SHIFT-2611-13.md) and [CHANGELOG.md](CHANGELOG.md).
+### Naming and PI readability (2611.14–2611.15)
+
+Version **2611.14** applied the naming decisions from the [2611.13 variable inventory](docs/RULES-NAMING-INVENTORY-2611-13.md) to the annotated Rules only: **61 identifiers renamed** (55 accepted proposals and six author-selected alternatives); `#Time`, `#chEnable` and `#chEnableChangeTime` remain as before. Names follow the [two-letter functional-prefix convention](docs/RULES-NAMING-CONVENTION.md), including `pi`, `rt`, `wc`, `hw`, `hp`, `cp`, `ch` and other domains. The author reported 2611.14 running on HeishaMon.
+
+Version **2611.15** publishes **both the annotated and loadable source** with the approved names and simplifies the equivalent PI expressions in `timer=9`:
+
+- `#rtDelta` continues to mean **actual room temperature minus setpoint** for the heating and GPIO hysteresis logic. The PI error is now written directly as `$piError = #rtSetpoint - #rtTemp`, positive when the room needs more heat.
+- Separate explicit I-contribution limits (`$piIMin = -5`, `$piIMax = 5`) and overall PI-output limits (`$piMin = -5`, `$piMax = 5`) replace limits calculated using `* -1`. Gains remain `$piKp = 1.2` and `$piKi = 0.05` per five-minute sample.
+- The conditional anti-windup, PI hold during DHW/temporary OFF, integration guard, numeric bounds, timer scheduling and heat-pump control decisions remain unchanged.
+
+The supplied annotated and loadable 2611.15 files have **identical executable token streams**. After mapping approved names, the control expressions outside timer 9 are identical to 2611.13; the PI rewrite is algebraically equivalent under the maintained room-delta invariant. See [CHANGELOG.md](CHANGELOG.md).
+
 ## OpenTherm room values
 
 The room setpoint and current room temperature are transported as their normal OpenTherm values instead of encoding room temperature in `maxRelativeModulation`.
@@ -111,7 +123,7 @@ Firmware without the required Rules GPIO support may fail to parse or evaluate `
 
 Timer 8 uses `gpio(33)` to select how the internal `#chEnable` heating-demand state is determined:
 
-- **GPIO33 is exactly 1 — HEMS Dim mode.** Evohome `?chEnable` is ignored for this demand calculation. Instead the room-temperature difference `#RoomTempDelta = #RoomTemp - #RoomSetpoint` controls `#chEnable` with hysteresis: heating demand becomes **1 below the room setpoint** (delta < 0 °C), becomes **0 above the room setpoint by more than 0.2 °C** (delta > +0.2 °C), and **retains its previous state** between those thresholds. The normal Evohome off-delay is cleared in Dim mode.
+- **GPIO33 is exactly 1 — HEMS Dim mode.** Evohome `?chEnable` is ignored for this demand calculation. Instead the room-temperature difference `#rtDelta = #rtTemp - #rtSetpoint` controls `#chEnable` with hysteresis: heating demand becomes **1 below the room setpoint** (delta < 0 °C), becomes **0 above the room setpoint by more than 0.2 °C** (delta > +0.2 °C), and **retains its previous state** between those thresholds. The normal Evohome off-delay is cleared in Dim mode.
 - **GPIO33 is anything other than 1 — normal Evohome mode.** Heating demand follows `?chEnable`; transient Evohome off signals are filtered, requiring an off period of more than 15 minutes before clearing an active `#chEnable`.
 
 Whenever `#chEnable` changes, timer 8 updates `#chEnableChangeTime`; the normal elapsed-time bookkeeping is retained. **This does not directly switch the heat pump on or off**: timer 4 still applies room-temperature, outside-temperature, compressor-runtime, overnight and other conditions before changing the required heat-pump state. In particular, turning on Dim mode is not an unconditional or immediate heat-pump stop.
@@ -120,7 +132,7 @@ The 2610.08 Dim behaviour supersedes the simpler GPIO33 heat-demand block from 2
 
 ## Startup protection (2610.07 and 2611.07)
 
-The `on @Main_Outlet_Temp` handler now calls `TaShift()` only when `isset(#Time)` is true. Timer 1 initialises `#Time` and adopts the current heat-pump state, including `#CompState = 2` if the compressor is already running at startup. This prevents the outlet-temperature event from calling TaShift before timer 1 has initialised the rules' state.
+The `on @Main_Outlet_Temp` handler now calls `TaShift()` only when `isset(#Time)` is true. Timer 1 initialises `#Time` and adopts the current heat-pump state, including `#cpState = 2` if the compressor is already running at startup. This prevents the outlet-temperature event from calling TaShift before timer 1 has initialised the rules' state.
 
 This is **an initialisation-order guard**, not a three-minute ban on lowering the heating target. As of 2611.07, `timer=1` also gates the startup of periodic timers 2–10 on eight checked input values. Event-driven Rules, including the `@Compressor_Freq` handler, are not themselves delayed by this timer gate; boot logs should still be reviewed after firmware upgrades.
 
@@ -136,7 +148,7 @@ This is **an initialisation-order guard**, not a three-minute ban on lowering th
 
 1. Save a copy of your existing rules and check the settings and integration above.
 2. Load the contents of `HeishaMon_Rules_BlB4.lua` into the HeishaMon rules editor, without Markdown fences.
-3. Check the boot log for `BLB Heishamon_rules_2611.13.lua`. If some inputs are not ready, look for `timer=1: waiting for HP / OT values` and confirm the periodic timers start once initialization succeeds. Check the Rules engine supports more than 127 variable slots and `gpio(33)`.
+3. Check the boot log for `BLB Heishamon_rules_2611.15.lua`. If some inputs are not ready, look for `timer=1: waiting for HP / OT values` and confirm the periodic timers start once initialization succeeds. Check the Rules engine supports more than 127 variable slots and `gpio(33)`.
 4. Verify that `#OutsideTemp` and `#HPStateP` are numeric, `?roomTempSet` and `?roomTemp` contain the intended values, and unwanted repeated `@SetHeatpump` commands do not occur.
 5. Monitor real operation, including heat-pump starts, compressor frequency, target temperature and defrosts. A successful load does not by itself validate physical control behavior.
 

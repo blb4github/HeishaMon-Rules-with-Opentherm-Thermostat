@@ -1,6 +1,6 @@
 # HeishaMon Rules — variable naming design criteria
 
-**Status:** NC-01–NC-12 and prefix grouping proposed in PR #14; the author has now selected all 64 names in the linked inventory (55 Rename, 6 Change, 3 unchanged). Code implementation is a separate step.
+**Status:** NC-01–NC-12 and the final name choices were reviewed in PR #14; the 61 selected renames were implemented in 2611.14 (commented source) and are published together with the loadable Rules in 2611.15. The remaining three identifiers were retained.
 **Reference ruleset:** 2611.13.
 **Scope:** Naming and documentation of user-defined global (`#`) and local (`$`) variables. This document does **not** authorize any renaming.
 
@@ -49,7 +49,7 @@ The goal is **consistent, compact, meaningful naming** without changes to heat-p
 
 - **`#Time`:** retain this established name. It is recalculated as `%day * 1440 + %hour * 60 + %minute`, giving minute resolution; it is not incremented by a separate timer. Elapsed differences are calculated modulo 10080.
 - **Signed durations:** `#CompRunMin` and `#chEnableOnMin` both represent a positive ON duration and a negative OFF duration in minutes. Evaluate them together; do not add `Signed` to just one. Document the shared sign convention.
-- **`Last` and `Prev`:** `#DHWTempP` → `#hwTempLast` would describe a last earlier sample retained for comparison. `#HPStateP` → `#hpStatePrev` and `#OMP` → `#hpModePrev` would denote previous states held for restoration. These are examples only, **not approved renames**.
+- **`Last` and `Prev`:** `#DHWTempP` → `#hwTempLast` would describe a last earlier sample retained for comparison. `#HPStateP` → `#hpStatePrev` and `#OMP` → `#hpModePrev` would denote previous states held for restoration. These examples were approved in the decision register and implemented in 2611.14/2611.15.
 - **Time terminology:** a timestamp could use `ChangeTime` or `StartTime`; elapsed time could use `RunTime`, `ElapsedMin`, or `StateMin`. Neither `Duration` nor `WeekMin` is compulsory.
 
 **Review priority:** semantic correctness and consistency **within a functional group**, then compactness/readability of complete expressions, and only then cosmetic uniformity.
@@ -70,7 +70,7 @@ The goal is **consistent, compact, meaningful naming** without changes to heat-p
 5. **Minifier and strings:** the loadable file is derived from the commented canonical source. The minifier is known to insert spaces around `/` even inside a diagnostic string (e.g. `HP/OT` becomes `HP / OT`). Handle this separately from variable-rename verification; do not silently adjust control semantics.
 6. **Rollback:** preserve working Rules 2611.13 and the validated firmware as a reproducible reference until a renamed version has passed tests.
 
-The [2611.13 variable inventory](RULES-NAMING-INVENTORY-2611-13.md) contains the original prefix-group proposals and the complete author's decision register. All 61 proposed changes have been decided; the six `Change` decisions specify an alternative final name.
+The [2611.13 variable inventory](RULES-NAMING-INVENTORY-2611-13.md) preserves the original proposals and complete author-approved decision register. All 61 changes are implemented in 2611.15, including the six `Change` decisions specifying alternatives.
 
 ## Review and decision process
 

@@ -24,7 +24,7 @@ Result:		Selected # state variables; starts timer=1.
 Called by:	System boot; timer=1 is first scheduled after 10 seconds.
 rule 01]]
 on System#Boot then
-	print('BLB Heishamon_rules_2611.14.lua');
+	print('BLB Heishamon_rules_2611.15.lua');
 	-- Initialize state without reading unavailable boot-time inputs.
 	#chStateMin = -1;					-- Signed minutes: on > 0, off < 0
 	#chEnableChangeTime = -1;
@@ -598,26 +598,28 @@ on timer=9 then
 	-- Independent controller parameters and correction limits (in C).
 	$piKp = 1.2;												-- Proportional gain
 	$piKi = 0.05;												-- Integral gain per five-minute sample
-	$piILimit = 5;												-- Maximum I contribution in C
-	$piLimit = 5;												-- Maximum total PI correction in C
+	$piIMin = -5;												-- Minimum I contribution in C
+	$piIMax = 5;												-- Maximum I contribution in C
+	$piMin = -5;												-- Minimum total PI correction in C
+	$piMax = 5;												-- Maximum total PI correction in C
 	-- Evohome is temporarily OFF (12 C) during DHW: hold both I state and PI output.
 	-- Resume only after the valve is back, DHW has finished and the normal setpoint is restored.
 	if #hwState < 1 && @ThreeWay_Valve_State == 0 && ?roomTempSet > 12 && #rtSetpoint > 12 then
-		$piError = #rtDelta * -1;
+		$piError = #rtSetpoint - #rtTemp;
 		$piP = $piKp * $piError;
 		-- Integrate only while room heating is considered available.
 		if #chEnable == 1 && #hpHeatingMode == 1 && #hwState < 2 && @ThreeWay_Valve_State == 0 && @Defrosting_State == 0 && #rtDelta <= 0.2 then
-			-- Store the I contribution itself, always limited to +/-5 C.
-			$piIntegralNext = min(max(#piIntegral + $piKi * $piError, $piILimit * -1), $piILimit);
+			-- Store the I contribution itself, always limited to the set bounderies.
+			$piIntegralNext = min(max(#piIntegral + $piKi * $piError, $piIMin), $piIMax);
 			$piCandidate = $piP + $piIntegralNext;
 			-- Conditional anti-windup allows unwinding but blocks further saturation.
-			if ($piCandidate <= $piLimit || $piError <= 0) && ($piCandidate >= $piLimit * -1 || $piError >= 0) then
+			if ($piCandidate <= $piMax || $piError <= 0) && ($piCandidate >= $piMin || $piError >= 0) then
 				#piIntegral = $piIntegralNext;
 			end
 		end
 		-- The I contribution is held during interruptions and setpoint changes.
 		$piOutput = $piP + #piIntegral;
-		#piCorrection = round(min(max($piOutput, $piLimit * -1), $piLimit));				-- Rounded correction for TaShift
+		#piCorrection = round(min(max($piOutput, $piMin), $piMax));					-- Rounded correction for TaShift
 	end
 end
 

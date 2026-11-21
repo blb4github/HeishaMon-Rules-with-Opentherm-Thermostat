@@ -1,6 +1,6 @@
 # Variabelenoverzicht en prefixvoorstellen — Rules 2611.13
 
-**Status:** auteur heeft alle 61 voorgestelde wijzigingen beoordeeld: 55 × `Rename` (voorgestelde naam) en 6 × `Change` (zelf gekozen definitieve naam). De overige 3 namen blijven gelijk. De Rules-code is nog niet aangepast.
+**Status:** alle 64 naamkeuzes door auteur vastgelegd en doorgevoerd: 55 × `Rename`, 6 × `Change`, 3 × ongewijzigd. Geïmplementeerd in 2611.14 (commented) en gepubliceerd in 2611.15 (commented + loadable).
 **Gebaseerd op:** `HeishaMon_Rules_BlB4_commented.lua` (versie 2611.13, bron-blob `dea01246fa04134e845c8e8247ee43e34d9f0818`) en [ontwerpcriteria NC-01–NC-12](RULES-NAMING-CONVENTION.md).
 
 ## Naamvorm, begrenzing en wijzigingsindeling
@@ -275,8 +275,8 @@ Gevraagde Quiet Mode en correctie tijdens DHW.
 | `#QMR` → `#qmReq` | `qm` | Prefix + naam | Rename | — |
 | `$QMDHW` → `$qmDHWOffset` | `qm` | Prefix + naam | Rename | — |
 
-## Implementatie blijft nadrukkelijk een aparte stap
+## Implementatie en verificatie
 
-Pas na per-naam-besluiten: geaccepteerde hernoemingen integraal doorvoeren in de canonieke Rules-bron inclusief parameterplaatsen, commentaren en referenties; na naamsubstitutie uitvoerbare tokens vergelijken; minifier draaien; naamvalidatie, variabelenslots, sprongafstand en compile/load- en praktijkgedrag controleren. De werkende 2611.13 blijft de terugvalbasis.
+Na vaststelling van de besluiten zijn de geaccepteerde namen integraal toegepast op de canonieke Rules-bron (inclusief parameters, commentaar en referenties). 2611.14 bevatte alleen de commented source; in 2611.15 zijn zowel de commented als de door de auteur aangeleverde loadable Rules opgenomen. De uitvoerbare code is vergeleken na naamtranslatie en de twee 2611.15-bestanden zijn token-equivalent; een afzonderlijke on-device test van 2611.15 is nog niet gerapporteerd. 2611.13 blijft de historische vergelijkingsbasis.
 
-**In deze PR wordt geen Rules-code gewijzigd.**
+**Historische context:** PR #14 bevatte uitsluitend de naamgevingskeuzes; PR #15 voerde deze door in de commented source. Versie 2611.15 publiceert de bijgewerkte Rules-bestanden.
